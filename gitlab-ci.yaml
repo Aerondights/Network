@@ -1,0 +1,13 @@
+# .gitlab-ci.yml
+vcenter_operations:
+  image: python:3.11-slim
+  script:
+    - pip install requests urllib3 certifi
+    - |
+      python vcenter_api_manager.py \
+        --host mondomaine.res \
+        --username "$VCENTER_USER" \
+        --password "$VCENTER_PASS" \
+        --csv vms.csv \
+        --download-certs \
+        --max-workers 50
