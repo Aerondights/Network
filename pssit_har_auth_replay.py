@@ -324,7 +324,7 @@ def main():
     diagram = generate_ascii_diagram(flow)
 
     print('Attempting to replay the flow using requests (this will perform network calls) ...')
-    replay_report = replay_flow(flow, start_url=args.start_url, username=username, password=password)
+    # replay_report = replay_flow(flow, start_url=args.start_url, username=username, password=password)
 
     final_report = {
         'har_path': har_path,
