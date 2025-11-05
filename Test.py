@@ -14,6 +14,49 @@ def get_vms_on_hosts_cpu_below_requests(session, base_url, threshold_mhz=50.0):
     Nécessite que la session soit déjà authentifiée.
     """
     sdk_url = f"{base_url}/sdk"
+import xml.etree.ElementTree as ET
+
+def get_perf_manager_ref(session, base_url):
+    sdk_url = f"{base_url}/sdk"
+    headers = {
+        "Content-Type": "text/xml; charset=utf-8",
+        "SOAPAction": "urn:vim25/5.5",
+        "Accept-Encoding": "identity"
+    }
+
+    body = """<?xml version="1.0" encoding="UTF-8"?>
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                      xmlns:vim25="urn:vim25">
+      <soapenv:Body>
+        <vim25:RetrieveServiceContent>
+          <_this type="ServiceInstance">ServiceInstance</_this>
+        </vim25:RetrieveServiceContent>
+      </soapenv:Body>
+    </soapenv:Envelope>"""
+
+    r = session.post(sdk_url, data=body, headers=headers, verify=False)
+    r.raise_for_status()
+
+    # Utiliser le binaire brut et parser avec namespace
+    root = ET.fromstring(r.content)
+    ns = {
+        "soapenv": "http://schemas.xmlsoap.org/soap/envelope/",
+        "vim25": "urn:vim25"
+    }
+
+    # Cherche l’élément perfManager
+    perf_elem = root.find(".//vim25:perfManager", ns)
+    if perf_elem is None:
+        perf_elem = root.find(".//perfManager")  # fallback sans namespace
+
+    if perf_elem is None:
+        raise RuntimeError("Impossible de trouver <perfManager> dans la réponse SOAP.")
+
+    perf_ref = perf_elem.text.strip() if perf_elem.text else None
+    if not perf_ref:
+        raise RuntimeError("Le tag <perfManager> est vide, impossible d’obtenir le MoRef.")
+
+    return perf_ref
 
     def soap_request(body: str) -> ET.Element:
         headers = {"Content-Type": "text/xml; charset=utf-8", "SOAPAction": "urn:vim25/5.5"}
