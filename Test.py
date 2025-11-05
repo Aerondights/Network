@@ -6,6 +6,84 @@ def _req_json(session: requests.Session, method: str, url: str, **kwargs):
     r = session.request(method, url, verify=True, timeout=30, **kwargs)
     r.raise_for_status()
     return r.json()
+import xml.etree.ElementTree as ET
+
+def get_vms_on_hosts_cpu_below_requests(session, base_url, threshold_mhz=50.0):
+    """
+    Version 100% requests : envoie des requêtes SOAP pour interroger PerformanceManager.
+    Nécessite que la session soit déjà authentifiée.
+    """
+    sdk_url = f"{base_url}/sdk"
+
+    def soap_request(body: str) -> ET.Element:
+        headers = {"Content-Type": "text/xml; charset=utf-8", "SOAPAction": "urn:vim25/5.5"}
+        r = session.post(sdk_url, data=body, headers=headers, verify=False)
+        r.raise_for_status()
+        return ET.fromstring(r.text)
+
+    # 1. Récupération du ServiceContent
+    body_service = """<?xml version="1.0" encoding="UTF-8"?>
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                      xmlns:vim25="urn:vim25">
+      <soapenv:Body>
+        <vim25:RetrieveServiceContent>
+          <_this type="ServiceInstance">ServiceInstance</_this>
+        </vim25:RetrieveServiceContent>
+      </soapenv:Body>
+    </soapenv:Envelope>"""
+    resp = soap_request(body_service)
+    content = resp.find(".//returnval")
+    perf_manager_ref = content.find("./perfManager").attrib["value"]
+
+    # 2. Récupération des hosts
+    r = session.get(f"{base_url}/rest/vcenter/host", verify=False)
+    r.raise_for_status()
+    hosts = r.json().get("value", [])
+
+    results = []
+
+    # 3. QueryPerf pour chaque host
+    for h in hosts:
+        host_ref = h["host"]
+        # SOAP QueryPerfRequest
+        body_query = f"""<?xml version="1.0" encoding="UTF-8"?>
+        <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                          xmlns:vim25="urn:vim25">
+          <soapenv:Body>
+            <vim25:QueryPerf>
+              <_this type="PerformanceManager">{perf_manager_ref}</_this>
+              <querySpec>
+                <entity type="HostSystem">{host_ref}</entity>
+                <metricId>
+                  <counterId>6</counterId> <!-- 6 est souvent cpu.usagemhz.average -->
+                </metricId>
+                <intervalId>20</intervalId>
+                <maxSample>1</maxSample>
+              </querySpec>
+            </vim25:QueryPerf>
+          </soapenv:Body>
+        </soapenv:Envelope>
+        """
+        resp = soap_request(body_query)
+        vals = [v.text for v in resp.findall(".//value/value")]
+        if not vals:
+            continue
+        try:
+            cpu_mhz = float(vals[-1])
+        except ValueError:
+            continue
+
+        if cpu_mhz < threshold_mhz:
+            # récupérer les VMs sur cet host (via REST)
+            params = {"filter.hosts": host_ref}
+            r_vms = session.get(f"{base_url}/rest/vcenter/vm", params=params, verify=False)
+            r_vms.raise_for_status()
+            for vm in r_vms.json().get("value", []):
+                vm["_host_id"] = host_ref
+                vm["_host_cpu_mhz"] = cpu_mhz
+                results.append(vm)
+
+    return results
 
 # --- 1) VMs éteintes ---
 def get_powered_off_vms(session: requests.Session, base_url: str) -> List[Dict]:
