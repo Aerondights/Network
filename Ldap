@@ -1,0 +1,174 @@
+param(
+    [Parameter(Mandatory=$true)]
+    [string]$GroupName,
+    
+    [Parameter(Mandatory=$false)]
+    [string]$Domain,
+    
+    [Parameter(Mandatory=$false)]
+    [string]$Server,
+    
+    [Parameter(Mandatory=$false)]
+    [switch]$Recursive,
+    
+    [Parameter(Mandatory=$false)]
+    [string]$OutputFile
+)
+
+function Get-DomainInfo {
+    if ($Domain) {
+        return $Domain
+    }
+    try {
+        $root = [ADSI]""
+        return $root.distinguishedName[0] -replace "DC=","" -replace ",","."
+    } catch {
+        Write-Error "Impossible de déterminer le domaine automatiquement"
+        exit 1
+    }
+}
+
+function Get-LdapPath {
+    param([string]$DomainName, [string]$LdapServer)
+    
+    $dc = "DC=" + ($DomainName -replace "\.",",DC=")
+    
+    if ($LdapServer) {
+        return "LDAP://$LdapServer/$dc"
+    }
+    return "LDAP://$dc"
+}
+
+function Get-GroupDistinguishedName {
+    param(
+        [string]$Group,
+        [string]$LdapPath
+    )
+    
+    $searcher = New-Object DirectoryServices.DirectorySearcher
+    $searcher.SearchRoot = [ADSI]$LdapPath
+    $searcher.Filter = "(&(objectClass=group)(|(cn=$Group)(distinguishedName=$Group)(sAMAccountName=$Group)))"
+    $searcher.PropertiesToLoad.AddRange(@("distinguishedName", "cn"))
+    $searcher.PageSize = 1000
+    
+    try {
+        $result = $searcher.FindOne()
+        if ($result) {
+            return $result.Properties["distinguishedname"][0]
+        }
+        Write-Error "Groupe '$Group' introuvable"
+        return $null
+    } catch {
+        Write-Error "Erreur LDAP: $_"
+        return $null
+    }
+}
+
+function Get-GroupMembers {
+    param(
+        [string]$GroupDN,
+        [string]$LdapPath,
+        [bool]$IsRecursive,
+        [hashtable]$ProcessedGroups = @{}
+    )
+    
+    if ($ProcessedGroups.ContainsKey($GroupDN)) {
+        return @()
+    }
+    $ProcessedGroups[$GroupDN] = $true
+    
+    $members = @()
+    $searcher = New-Object DirectoryServices.DirectorySearcher
+    $searcher.SearchRoot = [ADSI]$LdapPath
+    $searcher.Filter = "(distinguishedName=$GroupDN)"
+    $searcher.PropertiesToLoad.AddRange(@("member"))
+    $searcher.PageSize = 1000
+    
+    try {
+        $groupResult = $searcher.FindOne()
+        if (-not $groupResult) {
+            return @()
+        }
+        
+        $memberDNs = $groupResult.Properties["member"]
+        
+        foreach ($memberDN in $memberDNs) {
+            $memberSearcher = New-Object DirectoryServices.DirectorySearcher
+            $memberSearcher.SearchRoot = [ADSI]$LdapPath
+            $memberSearcher.Filter = "(distinguishedName=$memberDN)"
+            $memberSearcher.PropertiesToLoad.AddRange(@(
+                "objectClass", "cn", "dNSHostName", "operatingSystem",
+                "operatingSystemVersion", "distinguishedName", "sAMAccountName"
+            ))
+            
+            $memberResult = $memberSearcher.FindOne()
+            if ($memberResult) {
+                $objectClasses = $memberResult.Properties["objectclass"]
+                
+                if ($objectClasses -contains "computer") {
+                    $computerInfo = [PSCustomObject]@{
+                        ComputerName = $memberResult.Properties["cn"][0]
+                        DNSHostName = if ($memberResult.Properties["dnshostname"].Count -gt 0) { 
+                            $memberResult.Properties["dnshostname"][0] 
+                        } else { "N/A" }
+                        OperatingSystem = if ($memberResult.Properties["operatingsystem"].Count -gt 0) { 
+                            $memberResult.Properties["operatingsystem"][0] 
+                        } else { "N/A" }
+                        OSVersion = if ($memberResult.Properties["operatingsystemversion"].Count -gt 0) { 
+                            $memberResult.Properties["operatingsystemversion"][0] 
+                        } else { "N/A" }
+                        DistinguishedName = $memberResult.Properties["distinguishedname"][0]
+                        SamAccountName = $memberResult.Properties["samaccountname"][0]
+                    }
+                    $members += $computerInfo
+                }
+                elseif ($IsRecursive -and ($objectClasses -contains "group")) {
+                    $nestedMembers = Get-GroupMembers -GroupDN $memberDN -LdapPath $LdapPath -IsRecursive $true -ProcessedGroups $ProcessedGroups
+                    $members += $nestedMembers
+                }
+            }
+        }
+    } catch {
+        Write-Warning "Erreur lors de l'énumération des membres: $_"
+    }
+    
+    return $members
+}
+
+# Script principal
+Write-Host "[*] Démarrage de l'énumération LDAP" -ForegroundColor Cyan
+Write-Host "[*] Groupe cible: $GroupName" -ForegroundColor Cyan
+
+$targetDomain = Get-DomainInfo
+Write-Host "[*] Domaine: $targetDomain" -ForegroundColor Cyan
+
+$ldapPath = Get-LdapPath -DomainName $targetDomain -LdapServer $Server
+Write-Host "[*] Chemin LDAP: $ldapPath" -ForegroundColor Cyan
+
+$groupDN = Get-GroupDistinguishedName -Group $GroupName -LdapPath $ldapPath
+if (-not $groupDN) {
+    exit 1
+}
+
+Write-Host "[+] Groupe trouvé: $groupDN" -ForegroundColor Green
+
+if ($Recursive) {
+    Write-Host "[*] Mode récursif activé (groupes imbriqués inclus)" -ForegroundColor Yellow
+}
+
+Write-Host "[*] Énumération des ordinateurs membres..." -ForegroundColor Cyan
+$computers = Get-GroupMembers -GroupDN $groupDN -LdapPath $ldapPath -IsRecursive $Recursive
+
+Write-Host "`n[+] Nombre d'ordinateurs trouvés: $($computers.Count)" -ForegroundColor Green
+
+if ($computers.Count -gt 0) {
+    Write-Host "`n========== ORDINATEURS MEMBRES ==========" -ForegroundColor Yellow
+    $computers | Format-Table -AutoSize
+    
+    if ($OutputFile) {
+        $computers | Export-Csv -Path $OutputFile -NoTypeInformation -Encoding UTF8
+        Write-Host "[+] Résultats exportés vers: $OutputFile" -ForegroundColor Green
+    }
+}
+
+Write-Host "`n[*] Énumération terminée" -ForegroundColor Cyan
