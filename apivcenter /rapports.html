@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Éditeur de Rapport HTML - WYSIWYG</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Playfair+Display:wght@700&family=Roboto+Mono&display=swap" rel="stylesheet">
+    <style>
+        /* Style de l'interface */
+        body { font-family: 'Inter', sans-serif; background: #0f172a; color: #f8fafc; }
+        .glass { background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
+        
+        /* Style de l'élément sélectionné dans l'iframe */
+        .hw-editing-active { outline: 2px dashed #3b82f6 !important; cursor: pointer; }
+        
+        /* Scrollbar custom */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+
+        /* Animation d'entrée */
+        @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+        .panel-animated { animation: slideIn 0.3s ease-out; }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header class="glass p-4 flex justify-between items-center z-50">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-500 to-purple-600 flex items-center justify-center font-bold">R</div>
+            <h1 class="text-lg font-semibold">Éditeur de Rapport</h1>
+        </div>
+        <div class="flex gap-3">
+            <label class="cursor-pointer bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm font-medium transition">
+                📂 Importer un HTML
+                <input type="file" id="fileInput" accept=".html" class="hidden">
+            </label>
+            <button id="saveBtn" class="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 px-4 py-2 rounded-lg text-sm font-semibold transition shadow-lg">
+                💾 Enregistrer
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex overflow-hidden relative">
+        
+        <!-- Zone de l'iframe (Le rapport) -->
+        <div id="canvasArea" class="flex-1 bg-slate-900/50 p-4 flex items-center justify-center overflow-auto">
+            <div id="dropZone" class="w-full h-full border-2 border-dashed border-slate-600 rounded-xl flex flex-col items-center justify-center text-slate-400 transition hover:border-blue-500 hover:text-blue-400">
+                <svg class="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                <p class="text-xl font-semibold">Glissez-déposez votre rapport HTML ici</p>
+                <p class="text-sm mt-2">ou utilisez le bouton "Importer un HTML"</p>
+            </div>
+            <iframe id="reportFrame" class="w-full h-full bg-white rounded-xl shadow-2xl hidden"></iframe>
+        </div>
+
+        <!-- Panneau de modification (Caché par défaut) -->
+        <aside id="editPanel" class="w-80 glass border-l border-slate-700 p-5 overflow-y-auto hidden panel-animated">
+            <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+                ✏️ Propriétés de l'élément
+                <span id="selectedTag" class="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded font-mono"></span>
+            </h2>
+
+            <!-- Modification de texte -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-slate-400 mb-2">Texte</label>
+                <textarea id="editText" rows="3" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
+            </div>
+
+            <!-- Typographie -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-slate-400 mb-2">Police</label>
+                <select id="editFont" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    <option value="Inter">Inter (Moderne)</option>
+                    <option value="Playfair Display">Playfair Display (Élégant)</option>
+                    <option value="Roboto Mono">Roboto Mono (Code)</option>
+                    <option value="Arial">Arial (Classique)</option>
+                    <option value="Georgia">Georgia (Serif)</option>
+                </select>
+            </div>
+
+            <!-- Taille et Couleurs -->
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-2">Taille</label>
+                    <input id="editSize" type="number" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="px">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-2">Graisse</label>
+                    <select id="editWeight" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                        <option value="300">Léger</option>
+                        <option value="400">Normal</option>
+                        <option value="600">Gras</option>
+                        <option value="800">Extra Gras</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-2">Couleur texte</label>
+                    <input id="editColor" type="color" value="#000000" class="w-full h-10 bg-slate-800 border border-slate-600 rounded-lg cursor-pointer">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-2">Couleur fond</label>
+                    <input id="editBgColor" type="color" value="#ffffff" class="w-full h-10 bg-slate-800 border border-slate-600 rounded-lg cursor-pointer">
+                </div>
+            </div>
+
+            <!-- Propositions / Thèmes -->
+            <div class="mb-6">
+                <h3 class="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider">✨ Propositions de Style</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="applyTheme('dark')" class="bg-slate-800 hover:bg-slate-700 text-xs p-2 rounded-lg border border-slate-600 transition">🌙 Mode Sombre</button>
+                    <button onclick="applyTheme('corporate')" class="bg-blue-900 hover:bg-blue-800 text-xs p-2 rounded-lg border border-blue-700 transition">🏢 Corporate</button>
+                    <button onclick="applyTheme('pastel')" class="bg-pink-900 hover:bg-pink-800 text-xs p-2 rounded-lg border border-pink-700 transition">🍬 Pastel</button>
+                    <button onclick="applyTheme('elegant')" class="bg-yellow-900 hover:bg-yellow-800 text-xs p-2 rounded-lg border border-yellow-700 transition">✒️ Élégant</button>
+                </div>
+            </div>
+
+            <hr class="border-slate-700 mb-6">
+
+            <button onclick="deselectElement()" class="w-full bg-red-500/10 text-red-400 hover:bg-red-500/20 py-2 rounded-lg text-sm font-medium transition">
+                Désélectionner l'élément
+            </button>
+
+        </aside>
+    </main>
+
+    <script>
+        // Variables globales
+        let reportFrame = document.getElementById('reportFrame');
+        let dropZone = document.getElementById('dropZone');
+        let editPanel = document.getElementById('editPanel');
+        let selectedElement = null;
+
+        // --- GESTION DE L'IMPORT ---
+
+        // Glisser-Déposer
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-blue-500'); });
+        dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('border-blue-500'); });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-blue-500');
+            const file = e.dataTransfer.files[0];
+            if (file) loadHTMLFile(file);
+        });
+
+        // Bouton Importer
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) loadHTMLFile(file);
+        });
+
+        function loadHTMLFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const htmlContent = e.target.result;
+                renderReport(htmlContent);
+            };
+            reader.readAsText(file);
+        }
+
+        function renderReport(htmlContent) {
+            dropZone.classList.add('hidden');
+            reportFrame.classList.remove('hidden');
+            
+            // Injecter dans l'iframe
+            reportFrame.srcdoc = htmlContent;
+            
+            // Attendre que l'iframe charge pour attacher les événements
+            reportFrame.onload = () => {
+                injectEditorStyles();
+                attachClickListeners();
+            };
+        }
+
+        // --- GESTION DE L'ÉDITION ---
+
+        function injectEditorStyles() {
+            const doc = reportFrame.contentDocument;
+            const style = doc.createElement('style');
+            style.textContent = `
+                body { transition: all 0.3s ease; }
+                .hw-editing-active { outline: 2px dashed #3b82f6 !important; cursor: pointer; background-color: rgba(59, 130, 246, 0.1) !important; }
+                *:hover { cursor: pointer !important; }
+            `;
+            doc.head.appendChild(style);
+        }
+
+        function attachClickListeners() {
+            const doc = reportFrame.contentDocument;
+            doc.body.addEventListener('click', (e) => {
+                e.preventDefault(); // Empêcher les liens de fonctionner en mode édition
+                e.stopPropagation();
+                
+                // Retirer l'ancienne sélection
+                if (selectedElement) selectedElement.classList.remove('hw-editing-active');
+                
+                // Ajouter la nouvelle
+                selectedElement = e.target;
+                selectedElement.classList.add('hw-editing-active');
+                
+                // Afficher le panneau
+                editPanel.classList.remove('hidden');
+                updatePanel();
+            });
+        }
+
+        function updatePanel() {
+            if (!selectedElement) return;
+            const doc = reportFrame.contentDocument;
+            const computedStyle = doc.defaultView.getComputedStyle(selectedElement);
+
+            document.getElementById('selectedTag').innerText = selectedElement.tagName.toLowerCase();
+            document.getElementById('editText').value = selectedElement.innerText;
+            document.getElementById('editFont').value = computedStyle.fontFamily.split(',')[0].replace(/"/g, '').trim();
+            document.getElementById('editSize').value = parseInt(computedStyle.fontSize);
+            document.getElementById('editWeight').value = computedStyle.fontWeight;
+            document.getElementById('editColor').value = rgbToHex(computedStyle.color);
+            document.getElementById('editBgColor').value = rgbToHex(computedStyle.backgroundColor);
+        }
+
+        // Écouteurs du panneau
+        document.getElementById('editText').addEventListener('input', (e) => { if(selectedElement) selectedElement.innerText = e.target.value; });
+        document.getElementById('editFont').addEventListener('change', (e) => { if(selectedElement) selectedElement.style.fontFamily = `'${e.target.value}', sans-serif`; });
+        document.getElementById('editSize').addEventListener('input', (e) => { if(selectedElement) selectedElement.style.fontSize = `${e.target.value}px`; });
+        document.getElementById('editWeight').addEventListener('change', (e) => { if(selectedElement) selectedElement.style.fontWeight = e.target.value; });
+        document.getElementById('editColor').addEventListener('input', (e) => { if(selectedElement) selectedElement.style.color = e.target.value; });
+        document.getElementById('editBgColor').addEventListener('input', (e) => { if(selectedElement) selectedElement.style.backgroundColor = e.target.value; });
+
+        function deselectElement() {
+            if (selectedElement) selectedElement.classList.remove('hw-editing-active');
+            selectedElement = null;
+            editPanel.classList.add('hidden');
+        }
+
+        // --- PROPOSITIONS / THÈMES GLOBAUX ---
+
+        function applyTheme(type) {
+            const doc = reportFrame.contentDocument;
+            const body = doc.body;
+            const allText = doc.querySelectorAll('h1, h2, h3, h4, p, span, a, li, td, th');
+
+            switch(type) {
+                case 'dark':
+                    body.style.backgroundColor = '#0f172a';
+                    body.style.color = '#f8fafc';
+                    allText.forEach(el => el.style.color = '#f8fafc');
+                    break;
+                case 'corporate':
+                    body.style.backgroundColor = '#ffffff';
+                    body.style.color = '#1e293b';
+                    body.style.fontFamily = "'Inter', sans-serif";
+                    doc.querySelectorAll('h1, h2').forEach(el => { el.style.color = '#1e40af'; el.style.fontWeight = '800'; });
+                    break;
+                case 'pastel':
+                    body.style.backgroundColor = '#fdf2f8';
+                    body.style.color = '#701a75';
+                    doc.querySelectorAll('h1, h2').forEach(el => { el.style.color = '#be185d'; });
+                    break;
+                case 'elegant':
+                    body.style.backgroundColor = '#fafaf9';
+                    body.style.color = '#44403c';
+                    body.style.fontFamily = "'Playfair Display', serif";
+                    doc.querySelectorAll('h1, h2').forEach(el => { el.style.fontFamily = "'Playfair Display', serif"; el.style.fontWeight = '700'; });
+                    break;
+            }
+        }
+
+        // --- SAUVEGARDE ---
+
+        document.getElementById('saveBtn').addEventListener('click', () => {
+            if (!reportFrame.srcdoc) return alert("Veuillez d'abord importer un rapport.");
+
+            // Retirer les outlines de sélection avant de sauvegarder
+            if (selectedElement) selectedElement.classList.remove('hw-editing-active');
+            
+            // Récupérer le HTML modifié
+            const finalHtml = reportFrame.contentDocument.documentElement.outerHTML;
+            
+            // Créer le fichier et lancer le téléchargement
+            const blob = new Blob([`<!DOCTYPE html>\n${finalHtml}`], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'rapport_modifie.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+
+        // --- UTILITAIRES ---
+
+        function rgbToHex(rgb) {
+            if (rgb.startsWith('#')) return rgb;
+            if (rgb === 'rgba(0, 0, 0, 0)' || rgb === 'transparent') return '#ffffff'; // default pour le color picker
+            const result = rgb.match(/\d+/g);
+            if (!result) return '#000000';
+            return `#${parseInt(result[0]).toString(16).padStart(2, '0')}${parseInt(result[1]).toString(16).padStart(2, '0')}${parseInt(result[2]).toString(16).padStart(2, '0')}`;
+        }
+    </script>
+</body>
+</html>
