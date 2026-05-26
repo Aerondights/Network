@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rapport Solutions RDP Production — Windows 11 25H2 & F5 BIG-IP</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #070B16;
+  --surface: #0C1220;
+  --card: #111928;
+  --card2: #16203A;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.13);
+  --blue: #5B9CF6;
+  --blue-bg: rgba(91,156,246,0.10);
+  --blue-b: rgba(91,156,246,0.28);
+  --red: #F87171;
+  --red-bg: rgba(248,113,113,0.09);
+  --red-b: rgba(248,113,113,0.3);
+  --green: #34D399;
+  --green-bg: rgba(52,211,153,0.09);
+  --green-b: rgba(52,211,153,0.28);
+  --amber: #FBBF24;
+  --amber-bg: rgba(251,191,36,0.09);
+  --amber-b: rgba(251,191,36,0.28);
+  --purple: #A78BFA;
+  --purple-bg: rgba(167,139,250,0.09);
+  --purple-b: rgba(167,139,250,0.28);
+  --cyan: #22D3EE;
+  --cyan-bg: rgba(34,211,238,0.09);
+  --cyan-b: rgba(34,211,238,0.28);
+  --text: #DDE6F5;
+  --muted: #6E7D95;
+  --dim: #2E3C52;
+  --display: 'Sora', sans-serif;
+  --body: 'DM Sans', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --r: 10px;
+  --r-sm: 6px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:15px;line-height:1.78;}
+.page{max-width:1100px;margin:0 auto;padding:0 38px 120px;}
+
+/* TOC */
+.toc-float{position:fixed;top:28px;right:28px;width:230px;background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:16px;z-index:100;font-size:11px;}
+.toc-float h5{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:10px;}
+.toc-float a{display:block;color:var(--muted);text-decoration:none;padding:3px 0;font-family:var(--mono);transition:color 0.15s;}
+.toc-float a:hover{color:var(--blue);}
+.toc-float a.active{color:var(--blue);}
+.toc-num{display:inline-block;width:18px;color:var(--dim);}
+@media(max-width:1380px){.toc-float{display:none;}}
+
+/* HEADER */
+.header{padding:72px 0 60px;border-bottom:1px solid var(--border);margin-bottom:72px;position:relative;}
+.header::before{content:'';position:absolute;top:0;left:-38px;right:-38px;height:3px;background:linear-gradient(90deg,#5B9CF6 0%,#A78BFA 40%,#34D399 70%,#22D3EE 100%);}
+.header-meta{display:flex;align-items:center;gap:10px;margin-bottom:22px;flex-wrap:wrap;}
+.header-date{font-family:var(--mono);font-size:11px;color:var(--muted);}
+h1{font-family:var(--display);font-size:46px;font-weight:700;letter-spacing:-2px;line-height:1.06;margin-bottom:14px;background:linear-gradient(135deg,#DDE6F5 10%,#7AABDA 60%,#A78BFA 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.header-sub{font-family:var(--display);font-size:15px;font-weight:300;color:var(--muted);margin-bottom:28px;max-width:680px;line-height:1.65;}
+.header-tags{display:flex;flex-wrap:wrap;gap:8px;}
+.tag{padding:4px 12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:20px;font-family:var(--mono);font-size:11px;color:var(--muted);}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:4px;font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;}
+.b-red{background:var(--red-bg);color:var(--red);border:1px solid var(--red-b);}
+.b-green{background:var(--green-bg);color:var(--green);border:1px solid var(--green-b);}
+.b-amber{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-b);}
+.b-blue{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-b);}
+.b-purple{background:var(--purple-bg);color:var(--purple);border:1px solid var(--purple-b);}
+.b-cyan{background:var(--cyan-bg);color:var(--cyan);border:1px solid var(--cyan-b);}
+
+/* SECTIONS */
+.section{margin-bottom:80px;scroll-margin-top:30px;}
+.section-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:var(--blue);margin-bottom:8px;}
+h2{font-family:var(--display);font-size:28px;font-weight:600;letter-spacing:-0.5px;color:var(--text);margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+h3{font-family:var(--display);font-size:18px;font-weight:600;color:var(--text);margin-bottom:14px;margin-top:36px;}
+h4{font-family:var(--display);font-size:15px;font-weight:600;color:var(--text);margin-bottom:8px;}
+p{margin-bottom:14px;color:var(--muted);}
+p strong{color:var(--text);font-weight:500;}
+ul,ol{margin:0 0 14px 18px;color:var(--muted);}
+li{margin-bottom:7px;font-size:14px;}
+
+/* CARDS */
+.card-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:32px;}
+.card-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:22px;}
+.card-icon{font-size:22px;margin-bottom:10px;}
+.card h4{font-family:var(--display);font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px;}
+.card p{font-size:13px;line-height:1.55;margin-bottom:0;}
+.c-red{border-color:var(--red-b);background:linear-gradient(135deg,var(--card),rgba(248,113,113,0.04));}
+.c-green{border-color:var(--green-b);background:linear-gradient(135deg,var(--card),rgba(52,211,153,0.04));}
+.c-amber{border-color:var(--amber-b);background:linear-gradient(135deg,var(--card),rgba(251,191,36,0.04));}
+.c-blue{border-color:var(--blue-b);background:linear-gradient(135deg,var(--card),rgba(91,156,246,0.04));}
+.c-cyan{border-color:var(--cyan-b);background:linear-gradient(135deg,var(--card),rgba(34,211,238,0.04));}
+.c-purple{border-color:var(--purple-b);background:linear-gradient(135deg,var(--card),rgba(167,139,250,0.04));}
+
+/* CALLOUTS */
+.callout{border-left:3px solid;padding:14px 20px;border-radius:0 var(--r-sm) var(--r-sm) 0;margin:22px 0;}
+.callout-red{border-color:var(--red);background:var(--red-bg);}
+.callout-green{border-color:var(--green);background:var(--green-bg);}
+.callout-amber{border-color:var(--amber);background:var(--amber-bg);}
+.callout-blue{border-color:var(--blue);background:var(--blue-bg);}
+.callout-purple{border-color:var(--purple);background:var(--purple-bg);}
+.callout-cyan{border-color:var(--cyan);background:var(--cyan-bg);}
+.callout strong{color:var(--text);font-weight:600;}
+.callout p{margin-bottom:0;font-size:14px;}
+
+/* DIAGRAMS */
+.diagram-wrap{background:#040710;border:1px solid var(--border);border-radius:var(--r);padding:28px 24px;margin:26px 0;overflow-x:auto;}
+.diagram-label{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--dim);margin-bottom:22px;}
+
+/* TABLES */
+.tbl{width:100%;border-collapse:collapse;margin:16px 0;font-size:13px;}
+.tbl th{font-family:var(--display);font-size:12px;font-weight:600;padding:11px 14px;text-align:left;border-bottom:2px solid var(--border2);color:var(--muted);}
+.tbl th.th-r{color:var(--red);}
+.tbl th.th-g{color:var(--green);}
+.tbl th.th-b{color:var(--blue);}
+.tbl th.th-a{color:var(--amber);}
+.tbl td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--muted);}
+.tbl td:first-child{font-family:var(--mono);font-size:11px;white-space:nowrap;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tr:hover td{background:rgba(255,255,255,0.015);}
+.vr{color:var(--red);font-family:var(--mono);font-size:11px;}
+.vg{color:var(--green);font-family:var(--mono);font-size:11px;}
+.vm{color:var(--muted);font-family:var(--mono);font-size:11px;}
+.va{color:var(--amber);font-family:var(--mono);font-size:11px;}
+.vc{color:var(--cyan);font-family:var(--mono);font-size:11px;}
+.vp{color:var(--purple);font-family:var(--mono);font-size:11px;}
+
+/* CODE */
+.code-wrap{background:#03060E;border:1px solid var(--border);border-radius:var(--r-sm);margin:16px 0;overflow:hidden;}
+.code-top{background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;gap:10px;}
+.code-top-label{font-family:var(--mono);font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:0.08em;}
+.code-top-badge{font-family:var(--mono);font-size:9px;padding:2px 7px;border-radius:3px;}
+.code-wrap pre{font-family:var(--mono);font-size:12px;line-height:2;color:#A9C7F5;padding:20px 22px;overflow-x:auto;white-space:pre;}
+.code-wrap pre .c{color:#4A6C8A;}
+.code-wrap pre .k{color:#C792EA;}
+.code-wrap pre .v{color:#ADDB67;}
+.code-wrap pre .s{color:#F78C6C;}
+.code-wrap pre .ok{color:#34D399;}
+.code-wrap pre .warn{color:#FBBF24;}
+.code-wrap pre .err{color:#F87171;}
+.code-wrap pre .section{color:#22D3EE;font-weight:500;}
+
+/* SOLUTION CARDS */
+.sol{border:1px solid var(--border);border-radius:var(--r);margin-bottom:24px;overflow:hidden;}
+.sol-head{padding:18px 24px;display:flex;align-items:center;gap:16px;border-bottom:1px solid var(--border);}
+.sol-rank{font-family:var(--display);font-size:36px;font-weight:700;opacity:0.12;line-height:1;flex-shrink:0;width:50px;}
+.sol-title{font-family:var(--display);font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px;}
+.sol-badges{display:flex;gap:6px;flex-wrap:wrap;}
+.sol-body{padding:20px 24px;}
+.sol-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-bottom:16px;}
+.pros h5,.cons h5{font-family:var(--display);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px;}
+.pros h5{color:var(--green);}
+.cons h5{color:var(--red);}
+.pros li,.cons li{color:var(--muted);font-size:13px;margin-bottom:7px;padding-left:16px;position:relative;list-style:none;}
+.pros li::before{content:'+';position:absolute;left:0;color:var(--green);font-weight:700;}
+.cons li::before{content:'−';position:absolute;left:0;color:var(--red);font-weight:700;}
+.sol-g{border-color:var(--green-b);}.sol-g .sol-head{background:rgba(52,211,153,0.05);}
+.sol-b{border-color:var(--blue-b);}.sol-b .sol-head{background:rgba(91,156,246,0.05);}
+.sol-a{border-color:var(--amber-b);}.sol-a .sol-head{background:rgba(251,191,36,0.05);}
+.sol-p{border-color:var(--purple-b);}.sol-p .sol-head{background:rgba(167,139,250,0.05);}
+.sol-c{border-color:var(--cyan-b);}.sol-c .sol-head{background:rgba(34,211,238,0.05);}
+
+/* STEPS */
+.step{display:flex;gap:18px;margin-bottom:32px;}
+.step-n{flex-shrink:0;width:30px;height:30px;border-radius:50%;background:var(--blue-bg);border:1px solid var(--blue-b);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;color:var(--blue);font-weight:600;margin-top:2px;}
+.step-c{flex:1;}
+.step-c h4{margin-bottom:8px;}
+.step-c p{font-size:14px;margin-bottom:10px;}
+
+/* INLINE CODE */
+.ic{font-family:var(--mono);font-size:11.5px;color:var(--amber);background:var(--amber-bg);padding:2px 7px;border-radius:3px;}
+.ig{font-family:var(--mono);font-size:11.5px;color:var(--green);background:var(--green-bg);padding:2px 7px;border-radius:3px;}
+.ir{font-family:var(--mono);font-size:11.5px;color:var(--red);background:var(--red-bg);padding:2px 7px;border-radius:3px;}
+.ib{font-family:var(--mono);font-size:11.5px;color:var(--blue);background:var(--blue-bg);padding:2px 7px;border-radius:3px;}
+
+/* VERDICT BLOCKS */
+.verdict{border-radius:var(--r);padding:20px 24px;margin:20px 0;}
+.verdict-no{background:var(--red-bg);border:1px solid var(--red-b);}
+.verdict-yes{background:var(--green-bg);border:1px solid var(--green-b);}
+.verdict-partial{background:var(--amber-bg);border:1px solid var(--amber-b);}
+.verdict h5{font-family:var(--display);font-size:13px;font-weight:700;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em;}
+.verdict-no h5{color:var(--red);}
+.verdict-yes h5{color:var(--green);}
+.verdict-partial h5{color:var(--amber);}
+.verdict p{font-size:13px;margin-bottom:0;line-height:1.6;}
+
+/* DUAL PROBLEM */
+.dual{display:grid;grid-template-columns:1fr 1fr;gap:2px;border-radius:var(--r);overflow:hidden;margin:22px 0;}
+.dual-col{padding:22px 24px;}
+.dual-a{background:linear-gradient(135deg,rgba(248,113,113,0.08),rgba(248,113,113,0.03));border:1px solid var(--red-b);}
+.dual-b{background:linear-gradient(135deg,rgba(34,211,238,0.08),rgba(34,211,238,0.03));border:1px solid var(--cyan-b);margin-left:-1px;}
+.dual-col h4{font-family:var(--display);font-size:14px;font-weight:700;margin-bottom:4px;}
+.dual-a h4{color:var(--red);}
+.dual-b h4{color:var(--cyan);}
+.dual-col .dual-sub{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px;}
+.dual-a .dual-sub{color:rgba(248,113,113,0.5);}
+.dual-b .dual-sub{color:rgba(34,211,238,0.4);}
+.dual-col p{font-size:13px;margin-bottom:6px;}
+.dual-col ul{font-size:13px;}
+
+/* ROADMAP */
+.roadmap{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border-radius:var(--r);overflow:hidden;margin-top:22px;}
+.rm-col{background:var(--card);padding:22px;}
+.rm-period{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;}
+.rm-col:nth-child(1) .rm-period{color:var(--red);}
+.rm-col:nth-child(2) .rm-period{color:var(--amber);}
+.rm-col:nth-child(3) .rm-period{color:var(--green);}
+.rm-col h4{font-family:var(--display);font-size:15px;font-weight:600;color:var(--text);margin-bottom:14px;}
+.rm-col ul{list-style:none;margin:0;}
+.rm-col li{font-size:13px;color:var(--muted);margin-bottom:8px;padding-left:16px;position:relative;}
+.rm-col li::before{content:'→';position:absolute;left:0;color:var(--dim);}
+
+/* FOOTER */
+.footer{margin-top:80px;padding-top:22px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;}
+.footer p{font-family:var(--mono);font-size:11px;color:var(--dim);margin:0;}
+
+/* TEST RESULT */
+.test-ok{background:var(--green-bg);border:1px solid var(--green-b);border-radius:var(--r);padding:18px 22px;margin:12px 0;}
+.test-fail{background:var(--red-bg);border:1px solid var(--red-b);border-radius:var(--r);padding:18px 22px;margin:12px 0;}
+.test-partial{background:var(--amber-bg);border:1px solid var(--amber-b);border-radius:var(--r);padding:18px 22px;margin:12px 0;}
+.test-label{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;}
+.test-ok .test-label{color:rgba(52,211,153,0.6);}
+.test-fail .test-label{color:rgba(248,113,113,0.6);}
+.test-partial .test-label{color:rgba(251,191,36,0.6);}
+.test-title{font-family:var(--display);font-size:16px;font-weight:700;margin-bottom:8px;}
+.test-ok .test-title{color:var(--green);}
+.test-fail .test-title{color:var(--red);}
+.test-partial .test-title{color:var(--amber);}
+.test-body{font-size:13px;color:var(--muted);}
+
+@media print{body{background:#fff;color:#111;}.page{padding:20px;}.toc-float{display:none;}h1{-webkit-text-fill-color:#111;background:none;}.card,.sol,.diagram-wrap,.code-wrap{border-color:#ccc;background:#f8f8f8;}.code-wrap pre{color:#333;}.header::before{background:#555;}}
+</style>
+</head>
+<body>
+
+<!-- TOC flottante -->
+<nav class="toc-float">
+  <h5>Navigation</h5>
+  <a href="#contexte"><span class="toc-num">00</span>Contexte double-problème</a>
+  <a href="#analyse-yt"><span class="toc-num">01</span>Analyse vidéo YouTube</a>
+  <a href="#verdict-yt"><span class="toc-num">02</span>Verdict & viabilité</a>
+  <a href="#solutions-prod"><span class="toc-num">03</span>Solutions production</a>
+  <a href="#option-1"><span class="toc-num">04</span>Option 1 — F5 Passthrough</a>
+  <a href="#option-2"><span class="toc-num">05</span>Option 2 — Cert EKU RDP</a>
+  <a href="#option-3"><span class="toc-num">06</span>Option 3 — Signer .rdp</a>
+  <a href="#option-4"><span class="toc-num">07</span>Option 4 — GPO workaround</a>
+  <a href="#tests"><span class="toc-num">08</span>Tests & commandes</a>
+  <a href="#roadmap"><span class="toc-num">09</span>Roadmap</a>
+</nav>
+
+<div class="page">
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-meta">
+    <span class="badge b-red">Analyse — Production</span>
+    <span class="badge b-amber">Windows 11 25H2</span>
+    <span class="badge b-blue">F5 BIG-IP</span>
+    <span class="badge b-cyan">KB5083769 — Avril 2026</span>
+    <span class="header-date">Infrastructure VDI — Mai 2026</span>
+  </div>
+  <h1>Solutions RDP en production<br>— Analyse complète & viabilité</h1>
+  <p class="header-sub">Évaluation de toutes les options disponibles · Analyse critique de la vidéo YouTube woshub.com · Commandes de test exactes · Architecture F5 passthrough · Deux problèmes distincts — deux familles de solutions</p>
+  <div class="header-tags">
+    <span class="tag">NLA / EKU Remote Desktop Authentication</span>
+    <span class="tag">OID 1.3.6.1.4.1.311.54.1.2</span>
+    <span class="tag">SSL Bridging → Passthrough</span>
+    <span class="tag">rdpsign.exe / Code Signing OID 1.3.6.1.5.5.7.3.3</span>
+    <span class="tag">KB5083769 — Avril 2026</span>
+    <span class="tag">F5 FastL4 / Performance L4</span>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 00 — CONTEXTE : DOUBLE PROBLÈME
+════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="contexte">
+  <div class="section-label">00 — Contexte préalable</div>
+  <h2>Attention : deux problèmes distincts coexistent</h2>
+
+  <p>Avant tout, il est crucial de comprendre que l'environnement Windows 11 25H2 + mise à jour d'avril 2026 (KB5083769) génère <strong>deux problèmes indépendants</strong> qui peuvent sembler identiques mais ont des causes racines, des mécanismes et des solutions totalement différentes.</p>
+
+  <div class="callout callout-red">
+    <p><strong>Erreur fréquente :</strong> Confondre ces deux problèmes conduit à appliquer la mauvaise solution. Une solution qui corrige le problème B n'aura <em>aucun effet</em> sur le problème A, et vice versa. La vidéo YouTube analysée ici traite exclusivement du problème B.</p>
+  </div>
+
+  <div class="dual">
+    <div class="dual-col dual-a">
+      <div class="dual-sub">Problème A — Le sujet de votre rapport</div>
+      <h4>⛔ Échec NLA / TLS — EKU manquant</h4>
+      <p>Le client 25H2 refuse de s'authentifier via NLA car le certificat présenté par le F5 en SSL Bridging <strong>ne contient pas l'EKU "Remote Desktop Authentication"</strong> (OID 1.3.6.1.4.1.311.54.1.2). La connexion échoue <em>avant</em> même l'affichage de la fenêtre de saisie d'identifiants.</p>
+      <ul>
+        <li>Se produit lors de la phase NLA (Network Level Authentication)</li>
+        <li>Erreur : "Erreur d'authentification" / certificat invalide</li>
+        <li>Cause : F5 en SSL Bridging interpose son propre cert</li>
+        <li>Apparu avec Windows 11 25H2 (validation EKU devenue bloquante)</li>
+      </ul>
+    </div>
+    <div class="dual-col dual-b">
+      <div class="dual-sub">Problème B — Le sujet de la vidéo YouTube</div>
+      <h4>⚠ Avertissement à l'ouverture d'un fichier .rdp</h4>
+      <p>Après KB5083769 (Patch Tuesday avril 2026), l'ouverture d'un fichier <strong>.rdp non signé</strong> déclenche un avertissement de sécurité répété et désactive par défaut la redirection des ressources locales (presse-papiers, imprimantes, disques).</p>
+      <ul>
+        <li>Se produit à l'ouverture du fichier .rdp lui-même</li>
+        <li>Erreur : dialogue de sécurité "risque de phishing potentiel"</li>
+        <li>Cause : le fichier .rdp n'est pas signé numériquement</li>
+        <li>Apparu avec KB5083769 — avril 2026</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- SCHÉMA : Les deux problèmes sur la ligne de temps -->
+  <div class="diagram-wrap">
+    <div class="diagram-label">Chronologie — Deux problèmes introduits à des moments différents</div>
+    <svg width="100%" viewBox="0 0 980 180" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+      <!-- Timeline -->
+      <line x1="40" y1="90" x2="940" y2="90" stroke="rgba(255,255,255,0.12)" stroke-width="2" marker-end="url(#arr)"/>
+
+      <!-- Events -->
+      <!-- Oct 2025 — 25H2 -->
+      <circle cx="160" cy="90" r="6" fill="#5B9CF6"/>
+      <line x1="160" y1="84" x2="160" y2="42" stroke="rgba(91,156,246,0.4)" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="160" y="36" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11" fill="#5B9CF6">Oct 2025</text>
+      <text x="160" y="22" text-anchor="middle" font-family="Sora,sans-serif" font-size="10" fill="#4A7AC8">Windows 11 25H2</text>
+
+      <!-- Problème A label (below) -->
+      <line x1="160" y1="96" x2="160" y2="136" stroke="rgba(248,113,113,0.4)" stroke-width="1" stroke-dasharray="4 3"/>
+      <rect x="70" y="138" width="180" height="30" rx="5" fill="rgba(248,113,113,0.1)" stroke="rgba(248,113,113,0.35)" stroke-width="1"/>
+      <text x="160" y="152" text-anchor="middle" font-family="Sora,sans-serif" font-size="11" font-weight="600" fill="#F87171">Problème A actif</text>
+      <text x="160" y="164" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#C05050">EKU manquant → échec NLA</text>
+
+      <!-- Apr 2026 — KB5083769 -->
+      <circle cx="520" cy="90" r="6" fill="#22D3EE"/>
+      <line x1="520" y1="84" x2="520" y2="42" stroke="rgba(34,211,238,0.4)" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="520" y="36" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11" fill="#22D3EE">14 Avr 2026</text>
+      <text x="520" y="22" text-anchor="middle" font-family="Sora,sans-serif" font-size="10" fill="#1AADCC">KB5083769 — Patch Tuesday</text>
+
+      <!-- Problème B label (below) -->
+      <line x1="520" y1="96" x2="520" y2="136" stroke="rgba(34,211,238,0.4)" stroke-width="1" stroke-dasharray="4 3"/>
+      <rect x="430" y="138" width="180" height="30" rx="5" fill="rgba(34,211,238,0.1)" stroke="rgba(34,211,238,0.35)" stroke-width="1"/>
+      <text x="520" y="152" text-anchor="middle" font-family="Sora,sans-serif" font-size="11" font-weight="600" fill="#22D3EE">Problème B apparu</text>
+      <text x="520" y="164" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#1A8FA6">Avertissement .rdp non signé</text>
+
+      <!-- Today -->
+      <circle cx="800" cy="90" r="6" fill="#34D399"/>
+      <line x1="800" y1="84" x2="800" y2="42" stroke="rgba(52,211,153,0.4)" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="800" y="36" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11" fill="#34D399">Mai 2026</text>
+      <text x="800" y="22" text-anchor="middle" font-family="Sora,sans-serif" font-size="10" fill="#22A076">Aujourd'hui</text>
+
+      <!-- Both active now -->
+      <rect x="700" y="138" width="200" height="30" rx="5" fill="rgba(248,113,113,0.07)" stroke="rgba(248,113,113,0.2)" stroke-width="1"/>
+      <text x="800" y="152" text-anchor="middle" font-family="Sora,sans-serif" font-size="11" fill="#E05050">A + B coexistent</text>
+      <text x="800" y="164" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#8A3030">Deux corrections indépendantes</text>
+    </svg>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 01 — ANALYSE VIDÉO YOUTUBE
+════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="analyse-yt">
+  <div class="section-label">01 — Analyse vidéo YouTube</div>
+  <h2>Que propose la vidéo woshub.com ? (Problème B uniquement)</h2>
+
+  <p>La vidéo YouTube (<span class="ib">https://www.youtube.com/watch?v=AykyiZcbZac</span>) — publiée le 19 avril 2026 par le canal <strong>Windows OS Hub (woshub.com)</strong> — s'intitule : <em>"Remove the Security Warning When Opening an RDP File in Windows 11 After April 2026 Update"</em>. Elle répond au <strong>Problème B uniquement</strong> : les avertissements de sécurité à l'ouverture de fichiers .rdp introduits par KB5083769.</p>
+
+  <p>Deux solutions sont présentées dans la vidéo :</p>
+
+  <!-- SOLUTION YT-1 -->
+  <h3>Solution YT-1 — Clé de registre (workaround rapide)</h3>
+  <p>Désactiver le dialogue d'avertissement en forçant l'ancien comportement via une valeur de registre. Comme donner un passe-droit à la fenêtre qui crie "attention !" — elle sera bâillonnée.</p>
+
+  <div class="code-wrap">
+    <div class="code-top">
+      <span class="code-top-label">CMD ou PowerShell (Admin) — Clé de registre workaround</span>
+      <span class="code-top-badge" style="background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-b);">Workaround temporaire</span>
+    </div>
+    <pre><span class="c"># Méthode CMD (rapide, déployable par GPO)</span>
+REG ADD "HKLM\Software\Policies\Microsoft\Windows NT\Terminal Services\Client" <span class="k">/v</span> "RedirectionWarningDialogVersion" <span class="k">/t</span> REG_DWORD <span class="k">/d</span> "1" <span class="k">/F</span>
+
+<span class="c"># Méthode PowerShell équivalente</span>
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows NT\Terminal Services\Client" `
+    -Name "RedirectionWarningDialogVersion" -Type DWord -Value 1 -Force
+
+<span class="c"># Vérification</span>
+Get-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows NT\Terminal Services\Client" `
+    -Name "RedirectionWarningDialogVersion"</pre>
+  </div>
+
+  <!-- SOLUTION YT-2 -->
+  <h3>Solution YT-2 — Signer le fichier .rdp avec rdpsign.exe (solution recommandée par la vidéo)</h3>
+  <p>Apposer une signature numérique sur le fichier .rdp, comme un notaire appose son cachet sur un document officiel. Windows vérifie le cachet : si le cachet vient d'une autorité en laquelle il a confiance, plus d'avertissement.</p>
+
+  <p>Cela nécessite un certificat avec l'EKU <strong>Code Signing</strong> (OID 1.3.6.1.5.5.7.3.3) — à ne pas confondre avec l'EKU Remote Desktop Authentication (OID 1.3.6.1.4.1.311.54.1.2) du Problème A.</p>
+
+  <div class="code-wrap">
+    <div class="code-top">
+      <span class="code-top-label">PowerShell (Admin) — Création certificat auto-signé + signature du fichier .rdp</span>
+      <span class="code-top-badge" style="background:var(--cyan-bg);color:var(--cyan);border:1px solid var(--cyan-b);">Solution recommandée pour Problème B</span>
+    </div>
+    <pre><span class="section"># ── ÉTAPE 1 : Créer un certificat Code Signing (si pas de PKI d'entreprise)</span>
+$cert = New-SelfSignedCertificate `
+    -Subject "CN=RDP Publisher Corp" `
+    -Type CodeSigningCert `
+    -CertStoreLocation cert:\LocalMachine\My `
+    -KeyUsage DigitalSignature `
+    -NotAfter (Get-Date).AddYears(3)
+
+<span class="c"># Récupérer l'empreinte SHA256</span>
+$thumbprint = $cert.Thumbprint
+Write-Host "Thumbprint : $thumbprint" -ForegroundColor Cyan
+
+<span class="section"># ── ÉTAPE 2 : Signer le fichier .rdp</span>
+<span class="c"># (depuis la machine où la clé privée est disponible — poste admin)</span>
+rdpsign.exe /v /sha256 $thumbprint "C:\RDP\vdi-prod.rdp"
+
+<span class="c"># Réponse attendue si succès :</span>
+<span class="ok"># Successfully signed: C:\RDP\vdi-prod.rdp</span>
+
+<span class="section"># ── ÉTAPE 3 : Exporter le certificat public (sans clé privée)</span>
+Export-Certificate -Cert "Cert:\LocalMachine\My\$thumbprint" `
+    -FilePath "C:\RDP\rdp-publisher.cer"
+
+<span class="section"># ── ÉTAPE 4 : Distribuer aux clients via GPO (sur les machines cibles)</span>
+<span class="c"># Importer dans Trusted Publishers + Trusted Root via GPO ou manuellement :</span>
+Import-Certificate -FilePath "C:\RDP\rdp-publisher.cer" `
+    -CertStoreLocation Cert:\LocalMachine\TrustedPublisher
+Import-Certificate -FilePath "C:\RDP\rdp-publisher.cer" `
+    -CertStoreLocation Cert:\LocalMachine\Root
+
+<span class="section"># ── ÉTAPE 5 : Configurer GPO pour reconnaître le publisher (optionnel)</span>
+<span class="c"># Computer Config → Admin Templates → Windows Components</span>
+<span class="c"># → Remote Desktop Services → RDP Connection Client</span>
+<span class="c"># → "Specify SHA1 thumbprints of certificates representing trusted .rdp publishers"</span>
+<span class="c"># Valeur : l'empreinte SHA1 (pas SHA256) du certificat, sans espaces</span>
+$thumbprintSHA1 = (Get-Item "Cert:\LocalMachine\My\$thumbprint").GetCertHashString()
+Write-Host "SHA1 pour GPO : $thumbprintSHA1"</pre>
+  </div>
+
+  <!-- SCHÉMA : Ce que fait la signature rdpsign -->
+  <div class="diagram-wrap">
+    <div class="diagram-label">Mécanisme de signature .rdp — Problème B (indépendant de la NLA)</div>
+    <svg width="100%" viewBox="0 0 980 230" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="a2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="#22D3EE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+        <marker id="a3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="#34D399" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+
+      <!-- Légende : AVANT -->
+      <text x="40" y="22" font-family="JetBrains Mono,monospace" font-size="10" fill="#6E7D95" text-transform="uppercase" letter-spacing="0.1em">AVANT KB5083769 (ou après correction B)</text>
+      <text x="500" y="22" font-family="JetBrains Mono,monospace" font-size="10" fill="#6E7D95">APRÈS KB5083769 sans correction</text>
+      <line x1="480" y1="8" x2="480" y2="220" stroke="rgba(255,255,255,0.07)" stroke-width="1" stroke-dasharray="6 4"/>
+
+      <!-- Flux normal AVANT -->
+      <rect x="40" y="38" width="120" height="38" rx="7" fill="#0D1D35" stroke="#22D3EE" stroke-width="1.2"/>
+      <text x="100" y="58" text-anchor="middle" font-family="Sora,sans-serif" font-size="12" fill="#DDE6F5">fichier.rdp</text>
+      <text x="100" y="70" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#22D3EE">signé ✓</text>
+
+      <line x1="160" y1="57" x2="230" y2="57" stroke="#22D3EE" stroke-width="1.5" marker-end="url(#a2)"/>
+      <text x="195" y="50" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#22D3EE">double-clic</text>
+
+      <rect x="233" y="38" width="150" height="38" rx="7" fill="#071A11" stroke="#34D399" stroke-width="1.2"/>
+      <text x="308" y="57" text-anchor="middle" font-family="Sora,sans-serif" font-size="12" fill="#DDE6F5">mstsc.exe</text>
+      <text x="308" y="70" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#34D399">ouverture directe ✓</text>
+
+      <line x1="383" y1="57" x2="430" y2="57" stroke="#34D399" stroke-width="1.5" marker-end="url(#a3)"/>
+
+      <rect x="433" y="38" width="20" height="38" rx="4" fill="rgba(52,211,153,0.1)" stroke="rgba(52,211,153,0.3)" stroke-width="1"/>
+      <text x="443" y="62" text-anchor="middle" font-family="Sora,sans-serif" font-size="16" fill="#34D399">✓</text>
+
+      <!-- Note : phase NLA séparée -->
+      <rect x="40" y="100" width="420" height="50" rx="7" fill="rgba(91,156,246,0.05)" stroke="rgba(91,156,246,0.2)" stroke-width="1" stroke-dasharray="5 3"/>
+      <text x="250" y="120" text-anchor="middle" font-family="Sora,sans-serif" font-size="11" fill="#5B9CF6">NLA / TLS — phase indépendante, plus tard dans la connexion</text>
+      <text x="250" y="137" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#3A6A9A">La signature .rdp n'impacte PAS la validation du cert serveur lors de NLA</text>
+
+      <!-- Flux APRÈS sans correction -->
+      <rect x="510" y="38" width="120" height="38" rx="7" fill="#0D1D35" stroke="#F87171" stroke-width="1.2"/>
+      <text x="570" y="58" text-anchor="middle" font-family="Sora,sans-serif" font-size="12" fill="#DDE6F5">fichier.rdp</text>
+      <text x="570" y="70" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#F87171">non signé ✗</text>
+
+      <line x1="630" y1="57" x2="700" y2="57" stroke="#F87171" stroke-width="1.5"/>
+      <text x="665" y="50" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#F87171">double-clic</text>
+
+      <rect x="703" y="28" width="220" height="56" rx="7" fill="rgba(248,113,113,0.08)" stroke="#F87171" stroke-width="1.2"/>
+      <text x="813" y="50" text-anchor="middle" font-family="Sora,sans-serif" font-size="12" font-weight="600" fill="#F87171">⚠ Dialogue sécurité</text>
+      <text x="813" y="65" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#C05050">Redirection désactivée par défaut</text>
+      <text x="813" y="78" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#C05050">Clic utilisateur requis</text>
+
+      <!-- Note problème B -->
+      <rect x="510" y="105" width="450" height="38" rx="7" fill="rgba(251,191,36,0.05)" stroke="rgba(251,191,36,0.2)" stroke-width="1"/>
+      <text x="735" y="120" text-anchor="middle" font-family="Sora,sans-serif" font-size="11" fill="#FBBF24">C'est ce problème que résout la vidéo YouTube (Problème B)</text>
+      <text x="735" y="135" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#B08010">La NLA (Problème A) n'est toujours pas résolue par ces techniques</text>
+    </svg>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 02 — VERDICT
+════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="verdict-yt">
+  <div class="section-label">02 — Verdict de viabilité</div>
+  <h2>Les techniques de la vidéo sont-elles viables pour votre problème ?</h2>
+
+  <p>Réponse courte : <strong>Non pour le Problème A (NLA/EKU), Oui pour le Problème B (avertissement .rdp)</strong>. Voici pourquoi en détail :</p>
+
+  <!-- VERDICT YT-1 -->
+  <h3>Solution YT-1 — Clé registre RedirectionWarningDialogVersion</h3>
+  <div class="verdict verdict-no">
+    <h5>✗ NON VIABLE pour le Problème A (votre incident)</h5>
+    <p>Cette clé contrôle uniquement l'affichage du dialogue de sécurité à l'ouverture d'un fichier .rdp. Elle n'a <strong>aucun effet</strong> sur la validation du certificat TLS lors de la phase NLA. Même avec cette clé à 1, un client 25H2 connecté via la VIP F5 (SSL Bridging) continuera d'échouer à la NLA car le certificat du F5 ne contient pas l'EKU Remote Desktop Authentication (OID 1.3.6.1.4.1.311.54.1.2). Ces deux mécanismes sont dans des couches logicielles totalement séparées.</p>
+  </div>
+  <div class="verdict verdict-partial">
+    <h5>◑ VIABLE PARTIELLEMENT pour le Problème B (complémentaire)</h5>
+    <p>Comme workaround temporaire pour supprimer le dialogue de sécurité à l'ouverture des .rdp. Déployable en urgence par GPO. Non recommandé à long terme car il réintroduit le comportement que Microsoft a intentionnellement sécurisé avec KB5083769.</p>
+  </div>
+
+  <!-- VERDICT YT-2 -->
+  <h3>Solution YT-2 — Signature .rdp avec rdpsign.exe</h3>
+  <div class="verdict verdict-no">
+    <h5>✗ NON VIABLE pour le Problème A (votre incident)</h5>
+    <p>La signature d'un fichier .rdp n'affecte pas le certificat présenté par le serveur lors de la connexion TLS. Le fichier .rdp est signé avec un certificat <strong>Code Signing</strong> (EKU OID 1.3.6.1.5.5.7.3.3). Ce certificat est vérifié avant l'établissement de la connexion TCP. La NLA, elle, vérifie un tout autre certificat — celui que le <em>serveur</em> (ici, le F5) présente pendant le handshake TLS. Ce sont deux objets cryptographiques, deux vérifications, deux EKU et deux moments complètement différents dans le flux de connexion.</p>
+  </div>
+  <div class="verdict verdict-yes">
+    <h5>✓ VIABLE pour le Problème B (recommandé comme solution permanente)</h5>
+    <p>Solution pérenne pour éliminer les avertissements à l'ouverture des fichiers .rdp et restaurer la redirection des ressources. À combiner avec la solution F5 passthrough (Problème A) pour une résolution complète. Nécessite une PKI d'entreprise ou un certificat Code Signing commercial. La PKI interne AD CS est idéale : tous les postes domain-joinés font confiance automatiquement.</p>
+  </div>
+
+  <!-- TABLEAU RÉCAPITULATIF VIABILITÉ -->
+  <h3>Tableau de viabilité — récapitulatif</h3>
+  <table class="tbl">
+    <tr>
+      <th style="width:220px">Technique</th>
+      <th>Résout Problème A (NLA/EKU) ?</th>
+      <th>Résout Problème B (.rdp warning) ?</th>
+      <th>Recommandation</th>
+    </tr>
+    <tr>
+      <td>YT-1 — Registre RedirectionWarningDialogVersion=1</td>
+      <td><span class="vr">✗ Non — aucun effet sur NLA</span></td>
+      <td><span class="va">◑ Partiellement — workaround temporaire</span></td>
+      <td><span class="vm">Urgence uniquement</span></td>
+    </tr>
+    <tr>
+      <td>YT-2 — rdpsign.exe Code Signing</td>
+      <td><span class="vr">✗ Non — EKU et couche différentes</span></td>
+      <td><span class="vg">✓ Oui — solution permanente</span></td>
+      <td><span class="vg">Recommandé pour B</span></td>
+    </tr>
+    <tr>
+      <td>F5 SSL Passthrough (FastL4)</td>
+      <td><span class="vg">✓ Oui — résolution définitive</span></td>
+      <td><span class="vr">✗ Non — ne signe pas les .rdp</span></td>
+      <td><span class="vg">Recommandé pour A</span></td>
+    </tr>
+    <tr>
+      <td>Cert F5 avec EKU RDP OID</td>
+      <td><span class="vg">✓ Oui — résolution définitive</span></td>
+      <td><span class="vr">✗ Non — ne signe pas les .rdp</span></td>
+      <td><span class="vm">Alternatif complexe pour A</span></td>
+    </tr>
+    <tr>
+      <td>GPO "Warn me if auth fails"</td>
+      <td><span class="va">◑ Partiellement — dégrade la sécu</span></td>
+      <td><span class="vr">✗ Non</span></td>
+      <td><span class="vr">Urgence uniquement</span></td>
+    </tr>
+    <tr>
+      <td><strong>F5 Passthrough + rdpsign.exe</strong></td>
+      <td><span class="vg">✓ Oui</span></td>
+      <td><span class="vg">✓ Oui</span></td>
+      <td><span class="vg">★ Solution complète recommandée</span></td>
+    </tr>
+  </table>
+
+  <!-- SCHÉMA : Deux clés pour deux serrures -->
+  <div class="diagram-wrap">
+    <div class="diagram-label">Analogie — Deux problèmes = deux serrures = deux clés différentes</div>
+    <svg width="100%" viewBox="0 0 980 200" xmlns="http://www.w3.org/2000/svg">
+      <!-- Problème A -->
+      <rect x="30" y="30" width="420" height="140" rx="10" fill="rgba(248,113,113,0.05)" stroke="rgba(248,113,113,0.25)" stroke-width="1"/>
+      <text x="240" y="56" text-anchor="middle" font-family="Sora,sans-serif" font-size="13" font-weight="600" fill="#F87171">Problème A — Serrure NLA</text>
+      <text x="240" y="74" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#6E7D95">Validation certificat serveur pendant TLS Handshake</text>
+
+      <!-- Key A wrong -->
+      <rect x="50" y="92" width="160" height="60" rx="7" fill="rgba(248,113,113,0.07)" stroke="rgba(248,113,113,0.3)" stroke-width="1" stroke-dasharray="5 3"/>
+      <text x="130" y="116" text-anchor="middle" font-family="Sora,sans-serif" font-size="11" fill="#F87171">🔑 rdpsign.exe</text>
+      <text x="130" y="132" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#C05050">Code Signing EKU</text>
+      <text x="130" y="145" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#C05050">✗ Mauvaise clé</text>
+
+      <!-- Key A correct -->
+      <rect x="238" y="92" width="190" height="60" rx="7" fill="rgba(52,211,153,0.07)" stroke="rgba(52,211,153,0.35)" stroke-width="1"/>
+      <text x="333" y="116" text-anchor="middle" font-family="Sora,sans-serif" font-size="11" fill="#34D399">🔑 F5 Passthrough</text>
+      <text x="333" y="132" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#22A076">Cert VDI (EKU RDP OID)</text>
+      <text x="333" y="145" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#22A076">✓ Bonne clé</text>
+
+      <!-- Problème B -->
+      <rect x="530" y="30" width="420" height="140" rx="10" fill="rgba(34,211,238,0.05)" stroke="rgba(34,211,238,0.25)" stroke-width="1"/>
+      <text x="740" y="56" text-anchor="middle" font-family="Sora,sans-serif" font-size="13" font-weight="600" fill="#22D3EE">Problème B — Serrure fichier .rdp</text>
+      <text x="740" y="74" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#6E7D95">Validation signature éditeur du fichier .rdp</text>
+
+      <!-- Key B wrong -->
+      <rect x="550" y="92" width="160" height="60" rx="7" fill="rgba(248,113,113,0.07)" stroke="rgba(248,113,113,0.3)" stroke-width="1" stroke-dasharray="5 3"/>
+      <text x="630" y="116" text-anchor="middle" font-family="Sora,sans-serif" font-size="11" fill="#F87171">🔑 F5 Passthrough</text>
+      <text x="630" y="132" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#C05050">Config réseau</text>
+      <text x="630" y="145" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#C05050">✗ Mauvaise clé</text>
+
+      <!-- Key B correct -->
+      <rect x="740" y="92" width="190" height="60" rx="7" fill="rgba(52,211,153,0.07)" stroke="rgba(52,211,153,0.35)" stroke-width="1"/>
+      <text x="835" y="116" text-anchor="middle" font-family="Sora,sans-serif" font-size="11" fill="#34D399">🔑 rdpsign.exe</text>
+      <text x="835" y="132" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#22A076">Code Signing EKU</text>
+      <text x="835" y="145" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#22A076">✓ Bonne clé</text>
+    </svg>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 03 — SOLUTIONS PRODUCTION
+════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="solutions-prod">
+  <div class="section-label">03 — Solutions production disponibles</div>
+  <h2>Quatre options pour corriger le Problème A en production</h2>
+
+  <p>Voici les quatre options réalistes pour résoudre définitivement le blocage NLA/EKU en production. Elles sont classées par <strong>recommandation décroissante</strong> pour un environnement VDI avec F5 BIG-IP.</p>
+
+  <!-- Option 1 -->
+  <div class="sol sol-g" id="option-1">
+    <div class="sol-head">
+      <div class="sol-rank">01</div>
+      <div>
+        <div class="sol-badges">
+          <span class="badge b-green">★ Recommandée</span>
+          <span class="badge b-green">Pérenne</span>
+          <span class="badge b-green">Non-invasive VDI</span>
+          <span class="badge b-blue">Performance accrue</span>
+        </div>
+        <div class="sol-title" style="margin-top:7px;">F5 BIG-IP — SSL Passthrough (Performance Layer 4 / FastL4)</div>
+      </div>
+    </div>
+    <div class="sol-body">
+      <p><strong>Le principe en une phrase :</strong> Au lieu que le F5 ouvre la lettre et en écrive une nouvelle (SSL Bridging), le F5 livre la lettre fermée directement au destinataire (SSL Passthrough). Le client voit le vrai certificat de la VDI, avec le bon EKU.</p>
+      <div class="sol-grid">
+        <ul class="pros">
+          <h5>Avantages</h5>
+          <li>Résout définitivement l'EKU manquant sans aucune modification VDI</li>
+          <li>Meilleures performances réseau (FastL4 = accélération hardware ASIC)</li>
+          <li>Sécurité renforcée : le F5 ne déchiffre plus le flux RDP (pas de MITM interne)</li>
+          <li>Compatible 25H2 nativement et durablement — résiste aux prochaines mises à jour Windows</li>
+          <li>Change F5 limité et réversible en quelques minutes</li>
+          <li>Aucune modification côté PKI, VDI, domaine Active Directory</li>
+        </ul>
+        <ul class="cons">
+          <h5>Contraintes</h5>
+          <li>Perte de visibilité L7 sur le flux RDP (le F5 ne déchiffre plus)</li>
+          <li>Persistence uniquement Source Address Affinity (L4) — pas de cookie ou header RDP</li>
+          <li>Clients externes non-managés : la CA interne doit être trustée séparément</li>
+          <li>Ouverture d'un change F5 + fenêtre de maintenance requise</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Option 2 -->
+  <div class="sol sol-b" id="option-2">
+    <div class="sol-head">
+      <div class="sol-rank">02</div>
+      <div>
+        <div class="sol-badges">
+          <span class="badge b-blue">Complexe</span>
+          <span class="badge b-blue">Clients managés uniquement</span>
+          <span class="badge b-amber">PKI requise</span>
+        </div>
+        <div class="sol-title" style="margin-top:7px;">Émettre un certificat avec EKU Remote Desktop Authentication (OID 1.3.6.1.4.1.311.54.1.2) sur le F5</div>
+      </div>
+    </div>
+    <div class="sol-body">
+      <p><strong>Le principe en une phrase :</strong> Donner au F5 un certificat "accrédité RDP" — comme un douanier qui obtient le bon tampon sur son badge. Le F5 continue d'ouvrir les lettres (SSL Bridging), mais son badge est désormais reconnu par 25H2.</p>
+      <div class="sol-grid">
+        <ul class="pros">
+          <h5>Avantages</h5>
+          <li>Conserve la visibilité L7 du F5 (inspection du flux RDP possible)</li>
+          <li>Conserve la persistence L7 (cookie, header)</li>
+          <li>Pas de changement de type de VS sur le F5</li>
+          <li>Architecture actuelle préservée, seul le certificat change</li>
+        </ul>
+        <ul class="cons">
+          <h5>Contraintes</h5>
+          <li>Nécessite un template PKI AD CS avec l'OID 1.3.6.1.4.1.311.54.1.2 ajouté manuellement</li>
+          <li>Les CA publiques commerciales (DigiCert, Sectigo...) n'émettent PAS cet EKU</li>
+          <li>La CA émettrice doit être trustée par TOUS les clients (GPO AD pour les managés)</li>
+          <li>Inapplicable aux clients externes non-managés sans déploiement de CA</li>
+          <li>Configuration PKI complexe, risque d'erreur sur le template</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Option 3 — rdpsign (Problème B) -->
+  <div class="sol sol-c" id="option-3">
+    <div class="sol-head">
+      <div class="sol-rank">03</div>
+      <div>
+        <div class="sol-badges">
+          <span class="badge b-cyan">Complémentaire</span>
+          <span class="badge b-cyan">Problème B</span>
+          <span class="badge b-green">Solution durable</span>
+        </div>
+        <div class="sol-title" style="margin-top:7px;">Signature des fichiers .rdp avec rdpsign.exe (solution Problème B — à combiner avec l'option 1)</div>
+      </div>
+    </div>
+    <div class="sol-body">
+      <p><strong>À utiliser en complément de l'option 1</strong>, pas à la place. Résout les avertissements à l'ouverture des fichiers .rdp introduits par KB5083769. Nécessite un certificat Code Signing (OID 1.3.6.1.5.5.7.3.3) émis par votre PKI d'entreprise (AD CS idéalement).</p>
+      <div class="sol-grid">
+        <ul class="pros">
+          <h5>Avantages</h5>
+          <li>Supprime définitivement les dialogues de sécurité à l'ouverture des .rdp</li>
+          <li>Restaure la redirection des ressources (clipboard, imprimantes, disques) par défaut</li>
+          <li>Solution pérenne et alignée avec la politique Microsoft</li>
+          <li>Compatible avec GPO pour distribuer la confiance aux postes domain-joinés</li>
+        </ul>
+        <ul class="cons">
+          <h5>Contraintes</h5>
+          <li>Ne résout PAS le Problème A (NLA/EKU sur F5)</li>
+          <li>Signature doit être réalisée sur la machine avec la clé privée</li>
+          <li>Redistribution des .rdp signés à tous les utilisateurs</li>
+          <li>PKI d'entreprise avec template Code Signing recommandé</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Option 4 — GPO Workaround -->
+  <div class="sol sol-a" id="option-4">
+    <div class="sol-head">
+      <div class="sol-rank">04</div>
+      <div>
+        <div class="sol-badges">
+          <span class="badge b-amber">Workaround court terme</span>
+          <span class="badge b-red">Risque sécurité</span>
+          <span class="badge b-red">Déconseillé en prod bancaire</span>
+        </div>
+        <div class="sol-title" style="margin-top:7px;">GPO — Assouplissement de la validation NLA côté client 25H2</div>
+      </div>
+    </div>
+    <div class="sol-body">
+      <p><strong>Le principe en une phrase :</strong> Dire à Windows "si l'authentification échoue, affiche un avertissement mais laisse passer quand même". Comme lever une barrière routière parce qu'on n'a pas le badge — ça fonctionne, mais c'est une faille de sécurité.</p>
+      <div class="sol-grid">
+        <ul class="pros">
+          <h5>Avantages</h5>
+          <li>Déploiement immédiat sans toucher au F5 ni à la PKI</li>
+          <li>Réversible instantanément via GPO</li>
+          <li>Permet de débloquer les utilisateurs en urgence, le temps du change F5</li>
+        </ul>
+        <ul class="cons">
+          <h5>Contraintes</h5>
+          <li>Réintroduit la vulnérabilité que 25H2 corrige intentionnellement</li>
+          <li>Incompatible avec les audits de sécurité en environnement bancaire / sensible</li>
+          <li>Applicable uniquement aux postes managés domain-joinés (GPO AD)</li>
+          <li>Inapplicable aux clients externes non-managés</li>
+          <li>Doit être retiré impérativement après le change F5</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 08 — TESTS ET COMMANDES
+════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="tests">
+  <div class="section-label">08 — Tests &amp; commandes exactes</div>
+  <h2>Procédures de test détaillées avec commandes précises</h2>
+
+  <div class="callout callout-amber">
+    <p><strong>Environnement de test présupposé :</strong> Toutes les commandes ci-dessous s'appliquent à l'architecture décrite dans votre rapport — Client Windows 11 25H2 (domaine ygie), VIP F5 yres, VDI Windows (domaine ycam). Les noms de variables sont explicitement identifiés pour être remplacés.</p>
+  </div>
+
+  <!-- TEST A — Vérifier EKU avant changement -->
+  <h3>Test A — Audit du certificat actuel présenté par le F5 (avant le change)</h3>
+  <p>Avant tout changement, capturer et vérifier l'EKU du certificat présenté par le F5. Comme prendre une photo du problème avant de le réparer.</p>
+
+  <div class="step">
+    <div class="step-n">A1</div>
+    <div class="step-c">
+      <h4>Capturer le certificat TLS présenté par la VIP F5</h4>
+      <p>Depuis le poste client 25H2 (ou tout poste avec OpenSSL), se connecter en TLS sur le port 3389 de la VIP et extraire le certificat présenté.</p>
+      <div class="code-wrap">
+        <div class="code-top">
+          <span class="code-top-label">PowerShell — Client Windows (25H2 ygie)</span>
+          <span class="code-top-badge" style="background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-b);">Audit pré-change</span>
+        </div>
+        <pre><span class="section"># ── Test A1 : Capturer le certificat TLS du F5 via PowerShell</span>
+$vip = "10.x.x.x"     <span class="c"># ← Remplacer par l'IP de la VIP yres</span>
+$port = 3389
+
+$tcpClient = New-Object System.Net.Sockets.TcpClient($vip, $port)
+$sslStream = New-Object System.Net.Security.SslStream($tcpClient.GetStream(), $false, {$true})
+$sslStream.AuthenticateAsClient($vip)
+$cert = $sslStream.RemoteCertificate
+$cert2 = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($cert)
+
+<span class="c"># Afficher le Subject et l'EKU</span>
+Write-Host "Subject    : $($cert2.Subject)" -ForegroundColor Cyan
+Write-Host "Issuer     : $($cert2.Issuer)" -ForegroundColor Cyan
+Write-Host "Thumbprint : $($cert2.Thumbprint)" -ForegroundColor Cyan
+Write-Host "Valid until: $($cert2.NotAfter)" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Enhanced Key Usages (EKU) :" -ForegroundColor Yellow
+$cert2.Extensions | Where-Object {$_.Oid.FriendlyName -eq "Enhanced Key Usage"} | ForEach-Object {
+    $eku = New-Object System.Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension($_, $false)
+    foreach ($oid in $eku.EnhancedKeyUsages) {
+        Write-Host "  → $($oid.FriendlyName) ($($oid.Value))" -ForegroundColor White
+    }
+}
+
+$tcpClient.Close()
+
+<span class="c"># ── RÉSULTAT ATTENDU AVANT CHANGE (problème confirmé) :</span>
+<span class="err"># Enhanced Key Usages (EKU) :</span>
+<span class="err">#   → Server Authentication (1.3.6.1.5.5.7.3.1)</span>
+<span class="err">#   [EKU Remote Desktop Authentication ABSENT = problème confirmé]</span>
+
+<span class="c"># ── RÉSULTAT ATTENDU APRÈS PASSTHROUGH (problème résolu) :</span>
+<span class="ok"># Enhanced Key Usages (EKU) :</span>
+<span class="ok">#   → Server Authentication (1.3.6.1.5.5.7.3.1)</span>
+<span class="ok">#   → Remote Desktop Authentication (1.3.6.1.4.1.311.54.1.2)</span>
+<span class="ok">#   [EKU présent = connexion NLA 25H2 acceptée]</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-n">A2</div>
+    <div class="step-c">
+      <h4>Vérification via OpenSSL (depuis Linux/WSL ou F5 bash)</h4>
+      <div class="code-wrap">
+        <div class="code-top">
+          <span class="code-top-label">Bash — Linux/WSL ou F5 CLI</span>
+        </div>
+        <pre><span class="section"># Connexion TLS brute sur le port RDP et extraction du certificat</span>
+VIP="10.x.x.x"  <span class="c"># ← Remplacer</span>
+
+echo "" | openssl s_client -connect ${VIP}:3389 -starttls rdp 2>/dev/null | \
+    openssl x509 -noout -text | grep -A 20 "X509v3 Extended Key Usage"
+
+<span class="c"># Résultat attendu AVANT change (EKU absent) :</span>
+<span class="err"># X509v3 Extended Key Usage:</span>
+<span class="err">#     TLS Web Server Authentication</span>
+
+<span class="c"># Résultat attendu APRÈS passthrough (cert VDI avec EKU RDP) :</span>
+<span class="ok"># X509v3 Extended Key Usage:</span>
+<span class="ok">#     TLS Web Server Authentication</span>
+<span class="ok">#     1.3.6.1.4.1.311.54.1.2   ← Remote Desktop Authentication présent</span>
+
+<span class="section"># Si openssl -starttls rdp non disponible, dump brut SSL :</span>
+echo "" | openssl s_client -connect ${VIP}:3389 2>/dev/null | \
+    openssl x509 -noout -text 2>/dev/null | grep -E "(Subject|Issuer|OID|Key Usage)"</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- TEST B — F5 Passthrough configuration + vérification -->
+  <h3>Test B — Configuration F5 SSL Passthrough (Option 1)</h3>
+
+  <div class="step">
+    <div class="step-n">B1</div>
+    <div class="step-c">
+      <h4>Vérifier l'état actuel du Virtual Server avant modification</h4>
+      <div class="code-wrap">
+        <div class="code-top">
+          <span class="code-top-label">F5 TMSH — Audit avant change</span>
+        </div>
+        <pre><span class="section"># ── ÉTAT ACTUEL : afficher tous les profils du VS RDP</span>
+tmsh show ltm virtual &lt;nom-du-vs-rdp&gt; detail
+
+<span class="c"># Identifier dans la sortie :</span>
+<span class="c">#   Type : Standard (à changer en Performance Layer 4)</span>
+<span class="c">#   Profiles : rdp-client-ssl (présent = SSL Bridging actif)</span>
+<span class="c">#              rdp-server-ssl (présent = SSL Bridging actif)</span>
+
+<span class="section"># ── Lister les profils SSL attachés au VS</span>
+tmsh list ltm virtual &lt;nom-du-vs-rdp&gt; profiles
+
+<span class="c"># Exemple de sortie actuelle (à documenter avant le change) :</span>
+<span class="warn"># profiles {</span>
+<span class="warn">#     rdp-client-ssl { context clientside }</span>
+<span class="warn">#     rdp-server-ssl { context serverside }</span>
+<span class="warn">#     tcp { context all }</span>
+<span class="warn"># }</span>
+
+<span class="section"># ── Vérifier le pool et les membres</span>
+tmsh show ltm pool &lt;nom-du-pool-vdi&gt; members detail</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-n">B2</div>
+    <div class="step-c">
+      <h4>Appliquer la configuration Passthrough (FastL4)</h4>
+      <p>Cette séquence de commandes transforme le VS de SSL Bridging (L7) vers SSL Passthrough (L4). Chaque commande est idempotente et peut être rejouée.</p>
+      <div class="code-wrap">
+        <div class="code-top">
+          <span class="code-top-label">F5 TMSH — Change production (ordre strict à respecter)</span>
+          <span class="code-top-badge" style="background:var(--red-bg);color:var(--red);border:1px solid var(--red-b);">Fenêtre de maintenance requise</span>
+        </div>
+        <pre><span class="section"># ── ÉTAPE 1 : Changer le type du VS vers Performance (Layer 4)</span>
+tmsh modify ltm virtual &lt;nom-du-vs-rdp&gt; {
+    ip-protocol tcp
+    profiles replace-all-with { fastL4 { } }
+}
+
+<span class="section"># ── ÉTAPE 2 : Supprimer explicitement les profils SSL Client et Server</span>
+<span class="c"># (la commande précédente les remplace, mais vérification explicite recommandée)</span>
+tmsh modify ltm virtual &lt;nom-du-vs-rdp&gt; \
+    profiles delete { rdp-client-ssl rdp-server-ssl tcp }
+
+<span class="section"># ── ÉTAPE 3 : S'assurer que seul fastL4 est attaché</span>
+tmsh modify ltm virtual &lt;nom-du-vs-rdp&gt; {
+    profiles add { fastL4 { context all } }
+}
+
+<span class="section"># ── ÉTAPE 4 : Configurer la persistence Source Address Affinity</span>
+tmsh create ltm persistence source-addr rdp-src-affinity {
+    timeout 3600
+    match-across-services enabled
+    match-across-virtuals disabled
+}
+
+tmsh modify ltm virtual &lt;nom-du-vs-rdp&gt; {
+    persist replace-all-with {
+        rdp-src-affinity { default yes }
+    }
+}
+
+<span class="section"># ── ÉTAPE 5 : Vérifier le health monitor (doit être TCP:3389, pas HTTPS)</span>
+tmsh show ltm pool &lt;nom-du-pool-vdi&gt; members detail
+<span class="c"># Si monitor est HTTPS ou SSL, le remplacer :</span>
+tmsh create ltm monitor tcp rdp-tcp-monitor {
+    interval 10
+    timeout  31
+    dest     *.3389
+}
+tmsh modify ltm pool &lt;nom-du-pool-vdi&gt; { monitor rdp-tcp-monitor }
+
+<span class="section"># ── ÉTAPE 6 : Sauvegarder la configuration</span>
+tmsh save sys config
+
+<span class="section"># ── VÉRIFICATION finale de la configuration résultante</span>
+tmsh list ltm virtual &lt;nom-du-vs-rdp&gt;
+
+<span class="c"># Résultat attendu après change :</span>
+<span class="ok"># ltm virtual &lt;nom-du-vs-rdp&gt; {</span>
+<span class="ok">#     ip-protocol tcp</span>
+<span class="ok">#     persist { rdp-src-affinity { default yes } }</span>
+<span class="ok">#     pool &lt;nom-du-pool-vdi&gt;</span>
+<span class="ok">#     profiles {</span>
+<span class="ok">#         fastL4 { }      ← SEUL profil = passthrough actif</span>
+<span class="ok">#     }</span>
+<span class="ok">#     [ABSENT : rdp-client-ssl, rdp-server-ssl ← = passthrough confirmé]</span>
+<span class="ok"># }</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-n">B3</div>
+    <div class="step-c">
+      <h4>Test de validation de connexion depuis le poste 25H2</h4>
+      <div class="code-wrap">
+        <div class="code-top">
+          <span class="code-top-label">PowerShell — Client 25H2 ygie — Test de connexion complet</span>
+        </div>
+        <pre><span class="section"># ── Test 1 : Vérifier la connectivité TCP sur le port 3389 via la VIP</span>
+$vip = "10.x.x.x"   <span class="c"># VIP yres</span>
+Test-NetConnection -ComputerName $vip -Port 3389 -InformationLevel Detailed
+
+<span class="c"># Résultat attendu :</span>
+<span class="ok"># TcpTestSucceeded : True</span>
+<span class="ok"># PingSucceeded    : True (si ICMP autorisé)</span>
+
+<span class="section"># ── Test 2 : Vérifier l'EKU du cert désormais présenté (doit être VDI, pas F5)</span>
+$tcpClient = New-Object System.Net.Sockets.TcpClient($vip, 3389)
+$sslStream = New-Object System.Net.Security.SslStream($tcpClient.GetStream(), $false, {$true})
+$sslStream.AuthenticateAsClient($vip)
+$cert2 = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($sslStream.RemoteCertificate)
+
+Write-Host "Certificat présenté : $($cert2.Subject)" -ForegroundColor Cyan
+$cert2.Extensions | Where-Object {$_.Oid.FriendlyName -eq "Enhanced Key Usage"} | ForEach-Object {
+    $eku = New-Object System.Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension($_, $false)
+    foreach ($oid in $eku.EnhancedKeyUsages) {
+        $color = if ($oid.Value -eq "1.3.6.1.4.1.311.54.1.2") {"Green"} else {"Gray"}
+        Write-Host "  EKU: $($oid.FriendlyName) ($($oid.Value))" -ForegroundColor $color
+    }
+}
+$tcpClient.Close()
+
+<span class="c"># Résultat attendu APRÈS passthrough (certificat VDI présenté) :</span>
+<span class="ok"># Certificat présenté : CN=vdi-01.ycam.local  ← VDI, pas F5 !</span>
+<span class="ok">#   EKU: Server Authentication (1.3.6.1.5.5.7.3.1)</span>
+<span class="ok">#   EKU: Remote Desktop Authentication (1.3.6.1.4.1.311.54.1.2) ← présent !</span>
+
+<span class="section"># ── Test 3 : Lancer mstsc et vérifier la connexion manuelle</span>
+mstsc /v:10.x.x.x    <span class="c"># Via VIP yres</span>
+
+<span class="c"># Résultat attendu :</span>
+<span class="ok"># → La fenêtre de saisie d'identifiants s'affiche (NLA réussie)</span>
+<span class="ok"># → La connexion s'établit après saisie des credentials</span>
+<span class="ok"># [Si toujours erreur cert : vérifier que la CA VDI est dans le Trusted Root du client]</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- TEST C — Certificate EKU RDP sur F5 (Option 2) -->
+  <h3>Test C — Émettre un certificat avec EKU RDP via PKI AD CS (Option 2)</h3>
+
+  <div class="step">
+    <div class="step-n">C1</div>
+    <div class="step-c">
+      <h4>Créer un template AD CS avec l'OID Remote Desktop Authentication</h4>
+      <p>Sur le serveur AD CS (Autorité de Certification), créer un template de certificat enrichi de l'OID RDP. Comme commander un badge de sécurité à l'imprimerie officielle, en spécifiant qu'il doit inclure l'habilitation "RDP".</p>
+      <div class="code-wrap">
+        <div class="code-top">
+          <span class="code-top-label">PowerShell — Serveur AD CS (Admin CA)</span>
+          <span class="code-top-badge" style="background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-b);">Option 2 — PKI</span>
+        </div>
+        <pre><span class="section"># ── Créer le template via duplication (méthode recommandée)</span>
+<span class="c"># 1. Dans certtmpl.msc : dupliquer "Web Server" → nommer "RDP-Server-F5"</span>
+<span class="c"># 2. Onglet Extensions → Application Policies (EKU) → Ajouter manuellement l'OID :</span>
+
+<span class="c"># OID à ajouter au template :</span>
+<span class="ok">#   Remote Desktop Authentication = 1.3.6.1.4.1.311.54.1.2</span>
+
+<span class="section"># ── Via PowerShell (nécessite module ADCS ou certutil)</span>
+<span class="c"># Méthode certutil pour vérifier les templates existants :</span>
+certutil -CATemplates
+
+<span class="c"># Vérifier qu'un template avec l'OID RDP existe :</span>
+certutil -v -template | Select-String "1.3.6.1.4.1.311.54.1.2" -Context 5
+
+<span class="section"># ── Émettre le certificat depuis le F5 (via CSR)</span>
+<span class="c"># Sur le F5, générer un CSR :</span>
+tmsh create sys crypto key rdp-f5-key { key-size 2048 key-type rsa-private }
+tmsh create sys crypto csr rdp-f5-csr {
+    key rdp-f5-key
+    common-name "vip-rdp.votre-domaine.com"
+    subject-alternative-name "DNS:vip-rdp.votre-domaine.com"
+}
+
+<span class="c"># Exporter le CSR :</span>
+tmsh list sys crypto csr rdp-f5-csr
+<span class="c"># → Copier le CSR et le soumettre à la CA AD CS</span>
+
+<span class="section"># ── Soumettre le CSR à la CA (depuis Windows) :</span>
+certreq -submit -attrib "CertificateTemplate:RDP-Server-F5" rdp-f5.csr rdp-f5.cer
+
+<span class="c"># Vérifier que l'EKU RDP est dans le certificat émis :</span>
+certutil -dump rdp-f5.cer | Select-String "1.3.6.1.4.1.311.54.1.2"
+
+<span class="c"># Résultat attendu :</span>
+<span class="ok"># 1.3.6.1.4.1.311.54.1.2 Remote Desktop Authentication</span>
+<span class="ok">#   [EKU présent dans le certificat émis pour le F5]</span>
+
+<span class="section"># ── Importer le certificat sur le F5 et l'attacher au VS :</span>
+tmsh install sys crypto cert rdp-f5-cert from-local-file /path/to/rdp-f5.cer
+tmsh modify ltm profile client-ssl rdp-client-ssl { cert-key-chain add { default { cert rdp-f5-cert key rdp-f5-key } } }</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- TEST D — Signer les fichiers .rdp (Option 3 / Problème B) -->
+  <h3>Test D — Signer les fichiers .rdp pour corriger le Problème B (Solution YT-2 viable)</h3>
+
+  <div class="step">
+    <div class="step-n">D1</div>
+    <div class="step-c">
+      <h4>Procédure complète de signature via PKI d'entreprise AD CS</h4>
+      <div class="code-wrap">
+        <div class="code-top">
+          <span class="code-top-label">PowerShell (Admin) — Poste admin avec accès à la PKI AD CS</span>
+          <span class="code-top-badge" style="background:var(--cyan-bg);color:var(--cyan);border:1px solid var(--cyan-b);">Solution Problème B</span>
+        </div>
+        <pre><span class="section"># ── ÉTAPE 1 : Demander un certificat Code Signing à la PKI AD CS</span>
+<span class="c"># (Remplace la création auto-signée si une CA d'entreprise est disponible)</span>
+$cert = Get-Certificate `
+    -Template "CodeSigning" `
+    -CertStoreLocation "cert:\LocalMachine\My"
+
+<span class="c"># OU si auto-signé (lab/test) :</span>
+$cert = New-SelfSignedCertificate `
+    -Subject "CN=RDP Publisher - Corp VDI" `
+    -Type CodeSigningCert `
+    -CertStoreLocation cert:\LocalMachine\My `
+    -NotAfter (Get-Date).AddYears(3)
+
+<span class="section"># ── ÉTAPE 2 : Récupérer l'empreinte</span>
+$thumbprint = $cert.Thumbprint
+Write-Host "SHA256 Thumbprint : $thumbprint" -ForegroundColor Cyan
+
+<span class="c"># Vérifier que le certificat a bien l'EKU Code Signing :</span>
+$cert.EnhancedKeyUsageList | Format-Table FriendlyName, ObjectId
+<span class="c"># Résultat attendu :</span>
+<span class="ok"># FriendlyName    ObjectId</span>
+<span class="ok"># Code Signing    1.3.6.1.5.5.7.3.3</span>
+
+<span class="section"># ── ÉTAPE 3 : Signer le ou les fichiers .rdp</span>
+$rdpFile = "C:\RDP\vdi-prod.rdp"  <span class="c"># ← Adapter le chemin</span>
+
+rdpsign.exe /v /sha256 $thumbprint $rdpFile
+
+<span class="c"># Résultat attendu :</span>
+<span class="ok"># Successfully signed: C:\RDP\vdi-prod.rdp</span>
+<span class="err"># [Si erreur 0x8009200b : vérifier que la clé privée est accessible]</span>
+
+<span class="section"># ── ÉTAPE 4 : Vérifier la signature</span>
+<span class="c"># Inspecter le contenu du .rdp signé (la signature est en bas du fichier)</span>
+Get-Content $rdpFile | Select-Object -Last 5
+<span class="c"># On doit voir les lignes "signscope:s:..." et "signature:s:..." en fin de fichier</span>
+
+<span class="section"># ── ÉTAPE 5 : Distribuer le certificat public aux clients (GPO)</span>
+<span class="c"># Exporter le cert public :</span>
+Export-Certificate -Cert $cert -FilePath "C:\RDP\rdp-publisher.cer"
+
+<span class="c"># GPO Computer Config → Windows Settings → Security Settings</span>
+<span class="c"># → Public Key Policies → Trusted Publishers → Import rdp-publisher.cer</span>
+
+<span class="c"># OU via GPO "Specify SHA1 thumbprints of trusted .rdp publishers" :</span>
+$thumbprintSHA1 = (Get-Item "Cert:\LocalMachine\My\$thumbprint").GetCertHashString()
+Write-Host "SHA1 pour GPO: $thumbprintSHA1"  <span class="c"># → coller dans la GPO</span>
+
+<span class="section"># ── ÉTAPE 6 : Test de validation de la signature</span>
+<span class="c"># Vérifier la signature du fichier .rdp (script de vérification) :</span>
+$content = Get-Content $rdpFile -Raw
+if ($content -match "signature:s:(.+)") {
+    Write-Host "✓ Fichier .rdp signé" -ForegroundColor Green
+    Write-Host "Signature présente : $($matches[1].Substring(0,40))..." -ForegroundColor Gray
+} else {
+    Write-Host "✗ Fichier .rdp NON signé" -ForegroundColor Red
+}
+
+<span class="section"># ── Test final : ouvrir le .rdp depuis un poste client avec le cert distribué</span>
+<span class="c"># Résultat attendu : ouverture directe sans dialogue d'avertissement</span>
+<span class="ok"># → Aucun dialogue "risque de phishing"</span>
+<span class="ok"># → Redirection clipboard/imprimantes active par défaut</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- TEST E — GPO workaround -->
+  <h3>Test E — Déploiement GPO en urgence (Option 4 — workaround temporaire uniquement)</h3>
+
+  <div class="step">
+    <div class="step-n">E1</div>
+    <div class="step-c">
+      <h4>GPO "Warn me if authentication fails" — Assouplissement NLA temporaire</h4>
+      <div class="code-wrap">
+        <div class="code-top">
+          <span class="code-top-label">PowerShell / Registre — Déploiement et vérification GPO</span>
+          <span class="code-top-badge" style="background:var(--red-bg);color:var(--red);border:1px solid var(--red-b);">Urgence uniquement — À retirer après change F5</span>
+        </div>
+        <pre><span class="section"># ── Chemin GPO (via GPMC) :</span>
+<span class="c"># Computer Configuration</span>
+<span class="c">#  → Administrative Templates</span>
+<span class="c">#    → Windows Components</span>
+<span class="c">#      → Remote Desktop Services</span>
+<span class="c">#        → Remote Desktop Connection Client</span>
+<span class="c">#          → "Configure Authentication for the client"</span>
+<span class="c">#             Value : 2 (Warn me if authentication fails)</span>
+<span class="c">#             [ou : 0 = Do not connect / 1 = Always connect / 2 = Warn]</span>
+
+<span class="section"># ── Équivalent registre (pour test ou déploiement ciblé) :</span>
+<span class="c"># Appliquer sur les postes 25H2 uniquement via GPO ciblée par WMI filter :</span>
+<span class="c"># WMI Filter : SELECT * FROM Win32_OperatingSystem WHERE BuildNumber = "26200"</span>
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services\Client" `
+    /v "AuthenticationLevelOverride" /t REG_DWORD /d 2 /f
+
+<span class="section"># ── Vérification du déploiement :</span>
+gpupdate /force
+gpresult /h C:\GPO-Rapport.html /f
+<span class="c"># Vérifier dans le rapport HTML que la GPO est bien appliquée</span>
+
+<span class="section"># ── Vérifier la valeur de registre résultante :</span>
+Get-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services\Client" |
+    Select-Object AuthenticationLevelOverride
+
+<span class="c"># Résultat attendu :</span>
+<span class="ok"># AuthenticationLevelOverride : 2 (connexion avec avertissement)</span>
+
+<span class="section"># ── ROLLBACK après change F5 (OBLIGATOIRE) :</span>
+reg delete "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services\Client" `
+    /v "AuthenticationLevelOverride" /f
+gpupdate /force</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABLEAU DES RÉSULTATS ATTENDUS -->
+  <h3>Résumé des résultats attendus par test</h3>
+  <div class="card-3">
+    <div class="test-ok">
+      <div class="test-label">Test B3 — Après passthrough F5</div>
+      <div class="test-title">✓ Connexion OK</div>
+      <div class="test-body">Le certificat VDI est présenté (Subject = VDI, non F5). L'EKU Remote Desktop Authentication est présent. La mire de connexion 25H2 s'affiche. La session RDP s'établit.</div>
+    </div>
+    <div class="test-ok">
+      <div class="test-label">Test D1 — Après signature .rdp</div>
+      <div class="test-title">✓ Ouverture sans avertissement</div>
+      <div class="test-body">Le fichier .rdp s'ouvre sans dialogue de sécurité. La redirection clipboard et imprimantes est active par défaut. La signature est vérifiable dans le contenu du fichier.</div>
+    </div>
+    <div class="test-partial">
+      <div class="test-label">Test E1 — GPO workaround</div>
+      <div class="test-title">◑ Connexion avec avertissement</div>
+      <div class="test-body">La connexion s'établit malgré l'absence d'EKU, avec un avertissement affiché à l'utilisateur. Mesure temporaire uniquement — le certificat invalide est toujours utilisé.</div>
+    </div>
+  </div>
+
+  <!-- SCHÉMA FLUX DE TEST COMPLET -->
+  <div class="diagram-wrap">
+    <div class="diagram-label">Arbre de décision — Test de validation post-change</div>
+    <svg width="100%" viewBox="0 0 980 340" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="at" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+        <marker id="atg" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="#34D399" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+        <marker id="atr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="#F87171" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+
+      <!-- Start -->
+      <rect x="380" y="10" width="220" height="38" rx="8" fill="rgba(91,156,246,0.1)" stroke="rgba(91,156,246,0.4)" stroke-width="1.2"/>
+      <text x="490" y="30" text-anchor="middle" font-family="Sora,sans-serif" font-size="13" font-weight="600" fill="#DDE6F5">Après le change F5</text>
+      <text x="490" y="43" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#4A7AC8">Test A2 : Quel cert est présenté ?</text>
+
+      <line x1="490" y1="48" x2="490" y2="74" stroke="rgba(255,255,255,0.2)" stroke-width="1" marker-end="url(#at)"/>
+
+      <!-- Decision 1 -->
+      <polygon points="490,76 620,108 490,140 360,108" fill="rgba(251,191,36,0.07)" stroke="rgba(251,191,36,0.4)" stroke-width="1.2"/>
+      <text x="490" y="104" text-anchor="middle" font-family="Sora,sans-serif" font-size="11" fill="#FBBF24">Cert = VDI ?</text>
+      <text x="490" y="118" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#B08010">(Subject contient VDI, pas F5)</text>
+
+      <!-- Non = problème F5 config -->
+      <line x1="360" y1="108" x2="180" y2="108" stroke="#F87171" stroke-width="1.5" marker-end="url(#atr)"/>
+      <text x="265" y="102" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#F87171">Non</text>
+      <rect x="40" y="88" width="140" height="40" rx="7" fill="rgba(248,113,113,0.1)" stroke="rgba(248,113,113,0.35)" stroke-width="1"/>
+      <text x="110" y="106" text-anchor="middle" font-family="Sora,sans-serif" font-size="11" fill="#F87171">Revoir config F5</text>
+      <text x="110" y="120" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#C05050">fastL4 pas appliqué</text>
+
+      <!-- Oui → EKU check -->
+      <line x1="490" y1="140" x2="490" y2="166" stroke="rgba(255,255,255,0.2)" stroke-width="1" marker-end="url(#at)"/>
+      <text x="505" y="157" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#34D399">Oui</text>
+
+      <!-- Decision 2 -->
+      <polygon points="490,168 640,202 490,236 340,202" fill="rgba(251,191,36,0.07)" stroke="rgba(251,191,36,0.4)" stroke-width="1.2"/>
+      <text x="490" y="198" text-anchor="middle" font-family="Sora,sans-serif" font-size="11" fill="#FBBF24">EKU RDP présent ?</text>
+      <text x="490" y="212" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#B08010">OID 1.3.6.1.4.1.311.54.1.2</text>
+
+      <!-- Non = cert VDI sans EKU -->
+      <line x1="340" y1="202" x2="180" y2="202" stroke="#F87171" stroke-width="1.5" marker-end="url(#atr)"/>
+      <text x="255" y="196" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#F87171">Non</text>
+      <rect x="40" y="182" width="140" height="40" rx="7" fill="rgba(248,113,113,0.1)" stroke="rgba(248,113,113,0.35)" stroke-width="1"/>
+      <text x="110" y="200" text-anchor="middle" font-family="Sora,sans-serif" font-size="11" fill="#F87171">Cert VDI à corriger</text>
+      <text x="110" y="214" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#C05050">PKI VDI : ajouter EKU RDP</text>
+
+      <!-- Oui → CA trusted -->
+      <line x1="490" y1="236" x2="490" y2="262" stroke="rgba(255,255,255,0.2)" stroke-width="1" marker-end="url(#at)"/>
+      <text x="505" y="253" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#34D399">Oui</text>
+
+      <!-- Decision 3 -->
+      <polygon points="490,264 640,296 490,328 340,296" fill="rgba(251,191,36,0.07)" stroke="rgba(251,191,36,0.4)" stroke-width="1.2"/>
+      <text x="490" y="292" text-anchor="middle" font-family="Sora,sans-serif" font-size="11" fill="#FBBF24">CA VDI trustée</text>
+      <text x="490" y="306" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#B08010">par le client 25H2 ?</text>
+
+      <!-- Non = CA non trustée -->
+      <line x1="340" y1="296" x2="180" y2="296" stroke="#F87171" stroke-width="1.5" marker-end="url(#atr)"/>
+      <text x="255" y="290" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#F87171">Non</text>
+      <rect x="40" y="276" width="140" height="40" rx="7" fill="rgba(248,113,113,0.1)" stroke="rgba(248,113,113,0.35)" stroke-width="1"/>
+      <text x="110" y="294" text-anchor="middle" font-family="Sora,sans-serif" font-size="11" fill="#F87171">Distribuer CA via</text>
+      <text x="110" y="308" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#C05050">GPO Trusted Root</text>
+
+      <!-- Oui = SUCCESS -->
+      <line x1="640" y1="296" x2="800" y2="296" stroke="#34D399" stroke-width="1.5" marker-end="url(#atg)"/>
+      <text x="715" y="290" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#34D399">Oui</text>
+      <rect x="803" y="276" width="160" height="40" rx="7" fill="rgba(52,211,153,0.1)" stroke="rgba(52,211,153,0.35)" stroke-width="1"/>
+      <text x="883" y="294" text-anchor="middle" font-family="Sora,sans-serif" font-size="13" font-weight="700" fill="#34D399">✓ Connexion OK</text>
+      <text x="883" y="308" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="#22A076">NLA 25H2 réussie</text>
+    </svg>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 09 — ROADMAP
+════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="roadmap">
+  <div class="section-label">09 — Plan d'action consolidé</div>
+  <h2>Roadmap complète — Problème A + Problème B</h2>
+
+  <div class="callout callout-blue">
+    <p><strong>Stratégie globale :</strong> Combiner <strong>Option 1 (F5 Passthrough) + Solution YT-2 (rdpsign.exe)</strong> pour résoudre les deux problèmes simultanément et durablement. Ces deux actions sont indépendantes et peuvent être menées en parallèle.</p>
+  </div>
+
+  <div class="roadmap">
+    <div class="rm-col">
+      <div class="rm-period">Urgence — J+0 à J+2</div>
+      <h4>Déblocage utilisateurs</h4>
+      <ul>
+        <li>Déployer GPO workaround (Option 4) ciblée 25H2 pour débloquer les utilisateurs critiques</li>
+        <li>Déployer registre RedirectionWarningDialogVersion=1 (YT-1) pour le Problème B si bloquant</li>
+        <li>Documenter les postes impactés et ouvrir le change F5</li>
+        <li>Identifier l'environnement hom (VS test disponible)</li>
+      </ul>
+    </div>
+    <div class="rm-col">
+      <div class="rm-period">Court terme — J+2 à J+15</div>
+      <h4>Résolution pérenne</h4>
+      <ul>
+        <li>Appliquer F5 Passthrough sur le VS d'homologation — valider avec Test B3</li>
+        <li>Signer les fichiers .rdp avec rdpsign.exe (Solution YT-2) — valider avec Test D1</li>
+        <li>Distribuer le certificat publisher via GPO Trusted Publishers</li>
+        <li>Préparer le change F5 pour le VS de production (zcam)</li>
+        <li>Qualifier la confiance PKI des clients externes prod</li>
+      </ul>
+    </div>
+    <div class="rm-col">
+      <div class="rm-period">Moyen terme — J+15 à J+60</div>
+      <h4>Pérennisation</h4>
+      <ul>
+        <li>Déployer le passthrough sur tous les VS RDP de prod</li>
+        <li>Retirer les GPO workaround (Option 4 + YT-1)</li>
+        <li>Intégrer la signature .rdp dans le pipeline de déploiement VDI</li>
+        <li>Documenter l'architecture dans la CMDB</li>
+        <li>Mettre à jour les runbooks F5 et PKI</li>
+        <li>Revue PKI globale pour les clients multi-domaines non-managés</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- MATRICE DE DÉCISION FINALE -->
+  <h3>Matrice de décision finale — Quelle solution pour quel contexte ?</h3>
+  <table class="tbl">
+    <tr>
+      <th>Contexte</th>
+      <th class="th-g">Solution recommandée</th>
+      <th class="th-a">Alternative acceptable</th>
+      <th class="th-r">À éviter</th>
+    </tr>
+    <tr>
+      <td>Clients managés domain-joinés (ygie)</td>
+      <td><span class="vg">F5 Passthrough + rdpsign.exe</span></td>
+      <td><span class="va">Option 2 (cert EKU F5)</span></td>
+      <td><span class="vr">GPO workaround à long terme</span></td>
+    </tr>
+    <tr>
+      <td>Clients externes non-managés</td>
+      <td><span class="vg">F5 Passthrough + CA publique sur VDI</span></td>
+      <td><span class="va">—</span></td>
+      <td><span class="vr">Option 2 (CA interne non trustée)</span></td>
+    </tr>
+    <tr>
+      <td>Blocage utilisateurs critique J+0</td>
+      <td><span class="va">GPO workaround (Option 4) temporaire</span></td>
+      <td><span class="va">Registre YT-1 (Problème B)</span></td>
+      <td><span class="vr">Laisser en production sans plan</span></td>
+    </tr>
+    <tr>
+      <td>Environnement nécessitant inspection L7</td>
+      <td><span class="vg">Option 2 (cert EKU RDP sur F5)</span></td>
+      <td><span class="va">F5 Passthrough + sonde réseau</span></td>
+      <td><span class="vr">—</span></td>
+    </tr>
+    <tr>
+      <td>Avertissements à l'ouverture .rdp uniquement</td>
+      <td><span class="vg">rdpsign.exe (Solution YT-2)</span></td>
+      <td><span class="va">Registre YT-1 (temporaire)</span></td>
+      <td><span class="vr">Aucune action (risque UX)</span></td>
+    </tr>
+  </table>
+</section>
+
+<footer class="footer">
+  <p>Infrastructure VDI · Windows 11 25H2 · F5 BIG-IP · KB5083769 · PKI AD CS</p>
+  <p>Document technique — Analyse solutions production · Mai 2026</p>
+  <p>Solutions : F5 Passthrough (Problème A) · rdpsign.exe (Problème B)</p>
+</footer>
+
+</div>
+</body>
+</html>

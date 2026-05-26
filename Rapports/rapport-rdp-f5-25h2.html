@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analyse RDP — Windows 11 25H2 & VIP F5</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #080C18;
+  --surface: #0F1525;
+  --card: #151F35;
+  --card2: #1A2540;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.13);
+  --blue: #5B9CF6;
+  --blue-bg: rgba(91,156,246,0.1);
+  --blue-b: rgba(91,156,246,0.28);
+  --red: #F87171;
+  --red-bg: rgba(248,113,113,0.09);
+  --red-b: rgba(248,113,113,0.3);
+  --green: #34D399;
+  --green-bg: rgba(52,211,153,0.09);
+  --green-b: rgba(52,211,153,0.28);
+  --amber: #FBBF24;
+  --amber-bg: rgba(251,191,36,0.09);
+  --amber-b: rgba(251,191,36,0.28);
+  --purple: #A78BFA;
+  --purple-bg: rgba(167,139,250,0.09);
+  --purple-b: rgba(167,139,250,0.28);
+  --text: #DDE6F5;
+  --muted: #6E7D95;
+  --dim: #2E3C52;
+  --display: 'Sora', sans-serif;
+  --body: 'DM Sans', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --r: 10px;
+  --r-sm: 6px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--body);
+  font-size:15px;
+  line-height:1.75;
+}
+.page{max-width:1080px;margin:0 auto;padding:0 36px 100px;}
+
+/* ─── HEADER ─── */
+.header{padding:72px 0 56px;border-bottom:1px solid var(--border);margin-bottom:64px;position:relative;}
+.header::before{content:'';position:absolute;top:0;left:-36px;right:-36px;height:3px;background:linear-gradient(90deg,#5B9CF6,#A78BFA,#34D399);}
+.header-meta{display:flex;align-items:center;gap:10px;margin-bottom:22px;flex-wrap:wrap;}
+.header-date{font-family:var(--mono);font-size:11px;color:var(--muted);}
+h1{font-family:var(--display);font-size:44px;font-weight:700;letter-spacing:-1.8px;line-height:1.08;margin-bottom:12px;background:linear-gradient(135deg,#DDE6F5 20%,#7AABDA 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.header-sub{font-family:var(--display);font-size:16px;font-weight:300;color:var(--muted);margin-bottom:28px;}
+.header-tags{display:flex;flex-wrap:wrap;gap:8px;}
+.tag{padding:4px 12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:20px;font-family:var(--mono);font-size:11px;color:var(--muted);}
+
+/* ─── BADGES ─── */
+.badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:4px;font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;}
+.b-red{background:var(--red-bg);color:var(--red);border:1px solid var(--red-b);}
+.b-green{background:var(--green-bg);color:var(--green);border:1px solid var(--green-b);}
+.b-amber{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-b);}
+.b-blue{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-b);}
+.b-purple{background:var(--purple-bg);color:var(--purple);border:1px solid var(--purple-b);}
+
+/* ─── SECTIONS ─── */
+.section{margin-bottom:68px;}
+.section-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:var(--blue);margin-bottom:8px;}
+h2{font-family:var(--display);font-size:27px;font-weight:600;letter-spacing:-0.5px;color:var(--text);margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+h3{font-family:var(--display);font-size:17px;font-weight:600;color:var(--text);margin-bottom:12px;margin-top:32px;}
+p{margin-bottom:14px;color:var(--muted);}
+p strong{color:var(--text);font-weight:500;}
+ul,ol{margin:0 0 14px 18px;color:var(--muted);}
+li{margin-bottom:6px;font-size:14px;}
+
+/* ─── CARDS ─── */
+.card-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:32px;}
+.card-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:22px;}
+.card-icon{font-size:20px;margin-bottom:10px;}
+.card h4{font-family:var(--display);font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px;}
+.card p{font-size:13px;line-height:1.55;margin-bottom:0;}
+.c-red{border-color:var(--red-b);background:linear-gradient(135deg,var(--card),rgba(248,113,113,0.04));}
+.c-green{border-color:var(--green-b);background:linear-gradient(135deg,var(--card),rgba(52,211,153,0.04));}
+.c-amber{border-color:var(--amber-b);background:linear-gradient(135deg,var(--card),rgba(251,191,36,0.04));}
+.c-blue{border-color:var(--blue-b);background:linear-gradient(135deg,var(--card),rgba(91,156,246,0.04));}
+
+/* ─── TEST CARDS ─── */
+.test-ok{background:var(--green-bg);border:1px solid var(--green-b);border-radius:var(--r);padding:22px 26px;}
+.test-fail{background:var(--red-bg);border:1px solid var(--red-b);border-radius:var(--r);padding:22px 26px;}
+.test-route{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;}
+.test-result{font-family:var(--display);font-size:17px;font-weight:700;margin-bottom:10px;}
+.test-ok .test-result{color:var(--green);}
+.test-fail .test-result{color:var(--red);}
+.test-ok p,.test-fail p{font-size:13px;margin-bottom:0;line-height:1.5;}
+.flow-path{display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-bottom:12px;}
+.fn{padding:3px 10px;border-radius:4px;font-family:var(--mono);font-size:11px;}
+.fn-b{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-b);}
+.fn-a{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-b);}
+.fn-g{background:var(--green-bg);color:var(--green);border:1px solid var(--green-b);}
+.arrow-sym{color:var(--dim);font-size:12px;}
+
+/* ─── CALLOUTS ─── */
+.callout{border-left:3px solid;padding:14px 18px;border-radius:0 var(--r-sm) var(--r-sm) 0;margin:20px 0;}
+.callout-red{border-color:var(--red);background:var(--red-bg);}
+.callout-green{border-color:var(--green);background:var(--green-bg);}
+.callout-amber{border-color:var(--amber);background:var(--amber-bg);}
+.callout-blue{border-color:var(--blue);background:var(--blue-bg);}
+.callout strong{color:var(--text);font-weight:600;}
+.callout p{margin-bottom:0;font-size:14px;}
+
+/* ─── DIAGRAMS ─── */
+.diagram-wrap{background:#060A12;border:1px solid var(--border);border-radius:var(--r);padding:28px 24px;margin:24px 0;overflow-x:auto;}
+.diagram-label{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--dim);margin-bottom:20px;}
+
+/* ─── TABLES ─── */
+.tbl{width:100%;border-collapse:collapse;margin:16px 0;font-size:13px;}
+.tbl th{font-family:var(--display);font-size:12px;font-weight:600;padding:11px 14px;text-align:left;border-bottom:2px solid var(--border2);}
+.tbl th:first-child{color:var(--muted);}
+.tbl th.th-r{color:var(--red);}
+.tbl th.th-g{color:var(--green);}
+.tbl td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--muted);}
+.tbl td:first-child{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tr:hover td{background:rgba(255,255,255,0.015);}
+.vr{color:var(--red);font-family:var(--mono);font-size:12px;}
+.vg{color:var(--green);font-family:var(--mono);font-size:12px;}
+.vm{color:var(--muted);font-family:var(--mono);font-size:12px;}
+.va{color:var(--amber);font-family:var(--mono);font-size:12px;}
+
+/* ─── CODE ─── */
+.code-wrap{background:#050810;border:1px solid var(--border);border-radius:var(--r-sm);margin:14px 0;overflow:hidden;}
+.code-top{background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border);padding:8px 16px;font-family:var(--mono);font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:0.08em;}
+.code-wrap pre{font-family:var(--mono);font-size:12px;line-height:1.9;color:#A9C7F5;padding:18px 20px;overflow-x:auto;white-space:pre;}
+.code-wrap pre .c{color:#4A6C8A;}
+.code-wrap pre .k{color:#C792EA;}
+.code-wrap pre .v{color:#ADDB67;}
+.code-wrap pre .s{color:#F78C6C;}
+
+/* ─── SOLUTION CARDS ─── */
+.sol{border:1px solid var(--border);border-radius:var(--r);margin-bottom:20px;overflow:hidden;}
+.sol-head{padding:16px 22px;display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--border);}
+.sol-rank{font-family:var(--display);font-size:32px;font-weight:700;opacity:0.15;line-height:1;flex-shrink:0;}
+.sol-title{font-family:var(--display);font-size:16px;font-weight:600;color:var(--text);margin-bottom:5px;}
+.sol-badges{display:flex;gap:6px;margin-bottom:0;}
+.sol-body{padding:18px 22px;display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+.pros h5,.cons h5{font-family:var(--display);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;}
+.pros h5{color:var(--green);}
+.cons h5{color:var(--red);}
+.pros li,.cons li{color:var(--muted);font-size:13px;margin-bottom:6px;padding-left:16px;position:relative;list-style:none;}
+.pros li::before{content:'+';position:absolute;left:0;color:var(--green);font-weight:700;}
+.cons li::before{content:'−';position:absolute;left:0;color:var(--red);font-weight:700;}
+.sol-g{border-color:var(--green-b);}.sol-g .sol-head{background:rgba(52,211,153,0.05);}
+.sol-b{border-color:var(--blue-b);}.sol-b .sol-head{background:rgba(91,156,246,0.05);}
+.sol-a{border-color:var(--amber-b);}.sol-a .sol-head{background:rgba(251,191,36,0.05);}
+
+/* ─── STEPS ─── */
+.step{display:flex;gap:16px;margin-bottom:28px;}
+.step-n{flex-shrink:0;width:28px;height:28px;border-radius:50%;background:var(--blue-bg);border:1px solid var(--blue-b);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;color:var(--blue);font-weight:600;margin-top:2px;}
+.step-c h4{font-family:var(--display);font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;}
+.step-c p{font-size:14px;margin-bottom:10px;}
+.ic{font-family:var(--mono);font-size:12px;color:var(--amber);background:var(--amber-bg);padding:2px 6px;border-radius:3px;}
+.ig{font-family:var(--mono);font-size:12px;color:var(--green);background:var(--green-bg);padding:2px 6px;border-radius:3px;}
+
+/* ─── ROADMAP ─── */
+.roadmap{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border-radius:var(--r);overflow:hidden;margin-top:20px;}
+.rm-col{background:var(--card);padding:22px;}
+.rm-period{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;}
+.rm-col:nth-child(1) .rm-period{color:var(--amber);}
+.rm-col:nth-child(2) .rm-period{color:var(--blue);}
+.rm-col:nth-child(3) .rm-period{color:var(--green);}
+.rm-col h4{font-family:var(--display);font-size:15px;font-weight:600;color:var(--text);margin-bottom:14px;}
+.rm-col ul{list-style:none;margin:0;}
+.rm-col li{font-size:13px;color:var(--muted);margin-bottom:8px;padding-left:14px;position:relative;}
+.rm-col li::before{content:'→';position:absolute;left:0;color:var(--dim);}
+
+/* ─── FOOTER ─── */
+.footer{margin-top:80px;padding-top:22px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.footer p{font-family:var(--mono);font-size:11px;color:var(--dim);margin:0;}
+
+/* ─── PRINT ─── */
+@media print{
+  body{background:#fff;color:#111;}
+  .page{padding:20px;}
+  h1{-webkit-text-fill-color:#111;background:none;}
+  .card,.sol,.test-ok,.test-fail{border-color:#ccc;background:#f7f7f7;}
+  .diagram-wrap{background:#f0f0f0;border-color:#ccc;}
+  .code-wrap{background:#f0f0f0;border-color:#ccc;}
+  .code-wrap pre{color:#333;}
+  .header::before{background:#333;}
+  .roadmap{background:#ccc;}
+  .rm-col{background:#f7f7f7;}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ═══ HEADER ═══ -->
+<header class="header">
+  <div class="header-meta">
+    <span class="badge b-red">Incident — Homologation VDI</span>
+    <span class="badge b-amber">Windows 11 25H2</span>
+    <span class="badge b-blue">F5 BIG-IP</span>
+    <span class="header-date">Infrastructure VDI — Mai 2026</span>
+  </div>
+  <h1>Dysfonctionnement RDP<br>via VIP F5</h1>
+  <p class="header-sub">Analyse technique complète · Cause racine · Architecture F5 · Solutions · Configuration exacte</p>
+  <div class="header-tags">
+    <span class="tag">ygie → yres → ycam</span>
+    <span class="tag">SSL Bridging → Passthrough</span>
+    <span class="tag">NLA / TLS</span>
+    <span class="tag">EKU Remote Desktop Authentication</span>
+    <span class="tag">PKI interne</span>
+  </div>
+</header>
+
+<!-- ═══ SYNTHÈSE ═══ -->
+<section class="section">
+  <div class="section-label">Synthèse exécutive</div>
+  <h2>Ce qui se passe et pourquoi</h2>
+  <div class="card-3">
+    <div class="card c-red">
+      <div class="card-icon">⚠</div>
+      <h4>Le problème</h4>
+      <p>Windows 11 25H2 valide strictement le certificat TLS présenté lors de la phase NLA. Le F5 en SSL Bridging présente son <em>propre</em> certificat au client — sans l'EKU Remote Desktop Authentication obligatoire depuis 25H2.</p>
+    </div>
+    <div class="card c-amber">
+      <div class="card-icon">⬡</div>
+      <h4>Le mécanisme</h4>
+      <p>Le F5 crée deux sessions TLS distinctes : une côté client (avec le cert F5), une côté VDI (avec le cert VDI). Le client 25H2 ne voit jamais le cert VDI — il voit celui du F5, le rejette, et bloque la connexion avant toute saisie d'identifiants.</p>
+    </div>
+    <div class="card c-green">
+      <div class="card-icon">✓</div>
+      <h4>La solution</h4>
+      <p>Passer le Virtual Server F5 en mode <strong>SSL Passthrough (Performance Layer 4 / FastL4)</strong>. Le client voit directement le certificat de la VDI. Aucune modification côté VDI ou PKI requise.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ TESTS ═══ -->
+<section class="section">
+  <div class="section-label">01 — Résultats des tests</div>
+  <h2>Observations terrain</h2>
+  <div class="card-2">
+    <div class="test-ok">
+      <div class="test-route">Connexion directe</div>
+      <div class="test-result">✓ Connexion établie</div>
+      <div class="flow-path">
+        <span class="fn fn-b">25H2 ygie</span>
+        <span class="arrow-sym">──▶</span>
+        <span class="fn fn-g">23H2 ycam</span>
+      </div>
+      <p>Le client reçoit directement le certificat de la VDI cible. La PKI interne est trustée via GPO AD sur les deux domaines. Aucune interposition de proxy TLS.</p>
+    </div>
+    <div class="test-fail">
+      <div class="test-route">Via VIP F5</div>
+      <div class="test-result">✗ Erreur certificat</div>
+      <div class="flow-path">
+        <span class="fn fn-b">25H2 ygie</span>
+        <span class="arrow-sym">──▶</span>
+        <span class="fn fn-a">VIP yres</span>
+        <span class="arrow-sym">──▶</span>
+        <span class="fn fn-g">23H2 ycam</span>
+      </div>
+      <p>Erreur certificat bloquante. Impossible de saisir ses identifiants — la NLA échoue avant l'affichage de la mire. Connexion refusée par 25H2.</p>
+    </div>
+  </div>
+  <div class="callout callout-amber">
+    <p><strong>Observation clé :</strong> L'impossibilité de choisir ses identifiants est un symptôme, pas une cause. La phase NLA (Network Level Authentication) échoue lors de la validation TLS, en amont de toute tentative d'authentification utilisateur.</p>
+  </div>
+</section>
+
+<!-- ═══ CAUSE RACINE ═══ -->
+<section class="section">
+  <div class="section-label">02 — Analyse de la cause racine</div>
+  <h2>Pourquoi Windows 11 25H2 refuse la connexion</h2>
+
+  <p>La mise à jour 25H2 (avril 2026) transforme la validation du certificat TLS de la phase NLA en <strong>blocage dur</strong>. Ce qui était un avertissement ignorable est devenu une erreur fatale et non contournable côté client.</p>
+
+  <h3>Le comportement du F5 en SSL Bridging</h3>
+  <p>En mode SSL Bridging, le F5 <strong>termine</strong> la session TLS initiale du client puis <strong>réinitie</strong> une nouvelle session TLS vers le backend. Il agit comme un proxy TLS intermédiaire. Conséquence directe : c'est le certificat du F5 — et non celui de la VDI — qui est présenté au client lors de la phase NLA.</p>
+
+  <div class="diagram-wrap">
+    <div class="diagram-label">Séquence RDP via F5 — Mode SSL Bridging (situation actuelle — problème)</div>
+    <svg width="100%" viewBox="0 0 780 345" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="mr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="#F87171" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+        <marker id="mg" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="#34D399" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+      <!-- Entity boxes -->
+      <rect x="20" y="28" width="158" height="48" rx="8" fill="#0D1D35" stroke="#5B9CF6" stroke-width="1.2"/>
+      <text x="99" y="48" text-anchor="middle" font-family="Sora,sans-serif" font-size="13" font-weight="600" fill="#DDE6F5">Client 25H2</text>
+      <text x="99" y="65" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#3D5E8C">domaine ygie</text>
+
+      <rect x="308" y="28" width="158" height="48" rx="8" fill="#1E1400" stroke="#FBBF24" stroke-width="1.2"/>
+      <text x="387" y="48" text-anchor="middle" font-family="Sora,sans-serif" font-size="13" font-weight="600" fill="#DDE6F5">F5 VIP</text>
+      <text x="387" y="65" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#6B5000">domaine yres</text>
+
+      <rect x="596" y="28" width="158" height="48" rx="8" fill="#071E19" stroke="#34D399" stroke-width="1.2"/>
+      <text x="675" y="48" text-anchor="middle" font-family="Sora,sans-serif" font-size="13" font-weight="600" fill="#DDE6F5">VDI ycam</text>
+      <text x="675" y="65" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#1A5C4A">domaine ycam</text>
+
+      <!-- Lifelines -->
+      <line x1="99" y1="76" x2="99" y2="262" stroke="rgba(255,255,255,0.1)" stroke-width="1" stroke-dasharray="5 5"/>
+      <line x1="387" y1="76" x2="387" y2="262" stroke="rgba(255,255,255,0.1)" stroke-width="1" stroke-dasharray="5 5"/>
+      <line x1="675" y1="76" x2="675" y2="262" stroke="rgba(255,255,255,0.1)" stroke-width="1" stroke-dasharray="5 5"/>
+
+      <!-- Session TLS 1 -->
+      <text x="243" y="96" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11" fill="#E05252" letter-spacing="0.05em">── SESSION TLS 1 ──</text>
+      <text x="243" y="114" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="12" fill="#6E7D95">ClientHello + NLA (port 3389)</text>
+      <line x1="99" y1="122" x2="387" y2="122" stroke="#F87171" stroke-width="1.5" marker-end="url(#mr)"/>
+      <text x="243" y="142" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="12" fill="#F87171" font-weight="500">ServerHello + cert F5 (EKU RDP absent) ⚠</text>
+      <line x1="387" y1="150" x2="99" y2="150" stroke="#F87171" stroke-width="1.5" marker-end="url(#mr)"/>
+
+      <!-- Session TLS 2 -->
+      <text x="531" y="178" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11" fill="#34D399" letter-spacing="0.05em">── SESSION TLS 2 ──</text>
+      <text x="531" y="196" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="12" fill="#6E7D95">ClientHello (port 3389)</text>
+      <line x1="387" y1="204" x2="675" y2="204" stroke="#34D399" stroke-width="1.5" marker-end="url(#mg)"/>
+      <text x="531" y="224" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="12" fill="#34D399">ServerHello + cert VDI PKI ✓</text>
+      <line x1="675" y1="232" x2="387" y2="232" stroke="#34D399" stroke-width="1.5" marker-end="url(#mg)"/>
+
+      <!-- Results -->
+      <rect x="13" y="248" width="172" height="46" rx="7" fill="rgba(248,113,113,0.1)" stroke="rgba(248,113,113,0.4)" stroke-width="1"/>
+      <text x="99" y="267" text-anchor="middle" font-family="Sora,sans-serif" font-size="13" font-weight="700" fill="#F87171">Connexion refusée</text>
+      <text x="99" y="283" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#E05252">EKU Remote Desktop : absent</text>
+
+      <rect x="589" y="248" width="172" height="46" rx="7" fill="rgba(52,211,153,0.06)" stroke="rgba(52,211,153,0.2)" stroke-width="1"/>
+      <text x="675" y="267" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="12" fill="#34D399">Cert VDI valide et correct</text>
+      <text x="675" y="283" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#2C6B5A">Jamais vu du client</text>
+
+      <!-- Legend -->
+      <line x1="20" y1="326" x2="44" y2="326" stroke="#F87171" stroke-width="2"/>
+      <text x="50" y="327" font-family="DM Sans,sans-serif" font-size="11" fill="#6E7D95" dominant-baseline="central">TLS 1 — Client ↔ F5 (cert F5 présenté au client)</text>
+      <line x1="380" y1="326" x2="404" y2="326" stroke="#34D399" stroke-width="2"/>
+      <text x="410" y="327" font-family="DM Sans,sans-serif" font-size="11" fill="#6E7D95" dominant-baseline="central">TLS 2 — F5 ↔ VDI (invisible du client)</text>
+    </svg>
+  </div>
+
+  <h3>Conditions bloquantes introduites par 25H2</h3>
+  <table class="tbl">
+    <tr>
+      <th>Condition 25H2</th>
+      <th class="th-r">Cert F5 (ce que voit le client)</th>
+      <th class="th-g">Cert VDI (ce que le client devrait voir)</th>
+    </tr>
+    <tr>
+      <td>EKU Remote Desktop Auth<br><span style="font-size:10px;color:var(--dim)">OID 1.3.6.1.4.1.311.54.1.2</span></td>
+      <td><span class="vr">Absent ✗ — blocage fatal</span></td>
+      <td><span class="vg">Présent ✓</span></td>
+    </tr>
+    <tr>
+      <td>CN / SAN cohérent<br><span style="font-size:10px;color:var(--dim)">avec le FQDN contacté</span></td>
+      <td><span class="va">*.yres — pas ycam</span></td>
+      <td><span class="vg">vdi01.ycam.banque.fr ✓</span></td>
+    </tr>
+    <tr>
+      <td>CA trustée côté client<br><span style="font-size:10px;color:var(--dim)">Trusted Root CA store Windows</span></td>
+      <td><span class="va">Dépend du client</span></td>
+      <td><span class="vg">Oui si domain-joined ✓</span></td>
+    </tr>
+  </table>
+</section>
+
+<!-- ═══ TRUSTED ═══ -->
+<section class="section">
+  <div class="section-label">03 — Notion de "Trusted"</div>
+  <h2>Ce que signifie un certificat "trusted" et par qui</h2>
+
+  <p>Un certificat est <strong>trusted</strong> exclusivement <strong>du point de vue du client</strong> — la machine Windows 11 25H2. Windows maintient un magasin de certificats racines appelé <em>Trusted Root Certification Authorities</em>. Lors de la validation TLS, le client remonte la chaîne de certification jusqu'à la CA racine et vérifie sa présence dans ce magasin. Si la CA racine n'est pas dans le magasin : erreur, connexion refusée. Indépendamment de tout autre critère.</p>
+
+  <div class="card-2">
+    <div class="card c-green">
+      <h4>En homologation — ygie domain-joined</h4>
+      <p>Le poste ygie est rattaché à votre domaine AD. Il reçoit automatiquement via <strong>GPO Active Directory</strong> les certificats racines de votre PKI interne.<br><br>Le certificat de la VDI ycam, émis par cette PKI, est donc trusté par ce client. En passthrough, la connexion passe.</p>
+    </div>
+    <div class="card c-amber">
+      <h4>En production — clients externes non-gérés</h4>
+      <p>Les postes clients non-gérés par votre IT <strong>n'ont pas votre PKI interne</strong> dans leur Trusted Root store. Même avec le passthrough actif, si votre CA interne est inconnue du client, le certificat VDI déclenchera une erreur "CA non reconnue".<br><br>Ce point doit être qualifié séparément.</p>
+    </div>
+  </div>
+
+  <div class="callout callout-blue">
+    <p><strong>Point de vigilance prod :</strong> Le passthrough résout le problème d'EKU absent sur le cert F5. Mais si les clients externes ne font pas confiance à votre PKI interne, ils auront une erreur distincte (CA non trustée) même avec le cert VDI correct. Ces deux problèmes sont indépendants et doivent être traités séparément.</p>
+  </div>
+</section>
+
+<!-- ═══ ARCHITECTURE F5 ═══ -->
+<section class="section">
+  <div class="section-label">04 — Architecture F5</div>
+  <h2>Comment fonctionne une VIP F5</h2>
+
+  <p>Un <strong>Virtual Server (VS)</strong> est l'objet central du F5 BIG-IP. Il écoute sur une adresse IP virtuelle (la VIP) et un port définis, puis applique des profils et politiques au trafic avant de le router vers un pool de serveurs backend. C'est l'ensemble de ces profils qui détermine si le F5 agit en proxy TLS (Bridging) ou en relais transparent (Passthrough).</p>
+
+  <div class="diagram-wrap">
+    <div class="diagram-label">Anatomie d'un Virtual Server F5 BIG-IP — composants et rôles</div>
+    <svg width="100%" viewBox="0 0 780 330" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="mv" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+      <!-- Client -->
+      <rect x="305" y="10" width="165" height="42" rx="7" fill="#0D1D35" stroke="#5B9CF6" stroke-width="1.2"/>
+      <text x="387" y="35" text-anchor="middle" font-family="Sora,sans-serif" font-size="13" font-weight="600" fill="#DDE6F5">Client RDP :3389</text>
+      <line x1="387" y1="52" x2="387" y2="76" stroke="rgba(255,255,255,0.15)" stroke-width="1" marker-end="url(#mv)"/>
+
+      <!-- VS container -->
+      <rect x="20" y="80" width="738" height="150" rx="10" fill="rgba(251,191,36,0.04)" stroke="rgba(251,191,36,0.25)" stroke-width="1" stroke-dasharray="7 4"/>
+      <text x="42" y="103" font-family="JetBrains Mono,monospace" font-size="11" fill="#B8922C" letter-spacing="0.06em">VIRTUAL SERVER — 10.x.x.x:3389</text>
+
+      <!-- Client SSL -->
+      <rect x="42" y="112" width="160" height="54" rx="6" fill="rgba(248,113,113,0.1)" stroke="rgba(248,113,113,0.35)" stroke-width="1"/>
+      <text x="122" y="134" text-anchor="middle" font-family="Sora,sans-serif" font-size="12" font-weight="600" fill="#F87171">Client SSL Profile</text>
+      <text x="122" y="150" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#C05050">Termine TLS côté client</text>
+      <text x="122" y="161" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9.5" fill="#7A2020">Présente cert F5 ⚠</text>
+
+      <!-- Server SSL -->
+      <rect x="220" y="112" width="160" height="54" rx="6" fill="rgba(248,113,113,0.1)" stroke="rgba(248,113,113,0.35)" stroke-width="1"/>
+      <text x="300" y="134" text-anchor="middle" font-family="Sora,sans-serif" font-size="12" font-weight="600" fill="#F87171">Server SSL Profile</text>
+      <text x="300" y="150" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#C05050">Réinitie TLS vers VDI</text>
+      <text x="300" y="161" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9.5" fill="#7A2020">Opaque pour le client</text>
+
+      <!-- TCP Profile -->
+      <rect x="400" y="112" width="150" height="54" rx="6" fill="rgba(91,156,246,0.09)" stroke="rgba(91,156,246,0.28)" stroke-width="1"/>
+      <text x="475" y="134" text-anchor="middle" font-family="Sora,sans-serif" font-size="12" font-weight="600" fill="#5B9CF6">TCP / FastL4</text>
+      <text x="475" y="150" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#3A7AD4">Profile</text>
+      <text x="475" y="161" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9.5" fill="#2A5A9C">FastL4 → passthrough</text>
+
+      <!-- Default Pool -->
+      <rect x="568" y="112" width="170" height="54" rx="6" fill="rgba(167,139,250,0.09)" stroke="rgba(167,139,250,0.28)" stroke-width="1"/>
+      <text x="653" y="134" text-anchor="middle" font-family="Sora,sans-serif" font-size="12" font-weight="600" fill="#A78BFA">Default Pool</text>
+      <text x="653" y="150" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#7A5FD4">pool-vdi-rdp</text>
+      <text x="653" y="161" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9.5" fill="#5A40A0">LB vers VDI machines</text>
+
+      <line x1="387" y1="230" x2="387" y2="256" stroke="rgba(255,255,255,0.15)" stroke-width="1" marker-end="url(#mv)"/>
+
+      <!-- Pool members -->
+      <rect x="130" y="258" width="518" height="58" rx="8" fill="rgba(167,139,250,0.04)" stroke="rgba(167,139,250,0.18)" stroke-width="1"/>
+      <text x="155" y="276" font-family="JetBrains Mono,monospace" font-size="10" fill="#6040A0">POOL MEMBERS — Health monitor TCP:3389</text>
+      <rect x="148" y="282" width="110" height="26" rx="4" fill="rgba(167,139,250,0.1)" stroke="rgba(167,139,250,0.25)" stroke-width="1"/>
+      <text x="203" y="299" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11" fill="#C4B5FD">VDI-01:3389</text>
+      <rect x="272" y="282" width="110" height="26" rx="4" fill="rgba(167,139,250,0.1)" stroke="rgba(167,139,250,0.25)" stroke-width="1"/>
+      <text x="327" y="299" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11" fill="#C4B5FD">VDI-02:3389</text>
+      <rect x="396" y="282" width="110" height="26" rx="4" fill="rgba(167,139,250,0.1)" stroke="rgba(167,139,250,0.25)" stroke-width="1"/>
+      <text x="451" y="299" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11" fill="#C4B5FD">VDI-03:3389</text>
+      <rect x="520" y="282" width="110" height="26" rx="4" fill="rgba(167,139,250,0.05)" stroke="rgba(167,139,250,0.12)" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="575" y="299" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11" fill="#4A3A6A">VDI-N:3389</text>
+    </svg>
+  </div>
+
+  <table class="tbl">
+    <tr>
+      <th>Composant</th>
+      <th>Rôle</th>
+      <th>Impact RDP</th>
+    </tr>
+    <tr>
+      <td>Virtual Server</td>
+      <td>Point d'entrée. IP VIP + port. Orchestre tous les autres objets et définit le mode de traitement.</td>
+      <td>Détermine si le trafic est traité en L7 (Bridging) ou L4 (Passthrough).</td>
+    </tr>
+    <tr>
+      <td>Client SSL Profile</td>
+      <td>Termine la session TLS côté client. C'est lui qui présente le certificat F5 au client RDP.</td>
+      <td><span class="vr">Cause directe du problème. À supprimer en passthrough.</span></td>
+    </tr>
+    <tr>
+      <td>Server SSL Profile</td>
+      <td>Établit une nouvelle session TLS vers le backend VDI. Opaque pour le client.</td>
+      <td style="color:var(--muted)">Invisible du client. À supprimer en passthrough.</td>
+    </tr>
+    <tr>
+      <td>FastL4 Profile</td>
+      <td>Forwarding Layer 4 accéléré via ASIC hardware. Le F5 ne déchiffre pas, il route les octets.</td>
+      <td><span class="vg">C'est ce profil qui active le passthrough transparent.</span></td>
+    </tr>
+    <tr>
+      <td>Default Pool</td>
+      <td>Groupe de VDI backend avec health monitor et algorithme de load balancing.</td>
+      <td><span class="vm">Inchangé entre Bridging et Passthrough.</span></td>
+    </tr>
+  </table>
+</section>
+
+<!-- ═══ PASSTHROUGH ═══ -->
+<section class="section">
+  <div class="section-label">05 — Mode passthrough</div>
+  <h2>Comment fonctionne le SSL Passthrough</h2>
+
+  <p>En mode SSL Passthrough (Performance Layer 4 / FastL4), le F5 n'inspecte pas le contenu TLS. Il agit comme un <strong>aiguilleur TCP transparent</strong> : il reçoit le SYN client, sélectionne un membre du pool backend selon la règle de load balancing, puis "splice" les deux connexions TCP. Chaque octet reçu d'un côté est transmis tel quel à l'autre côté. La handshake TLS entre le client et la VDI passe intégralement sans interception.</p>
+
+  <div class="diagram-wrap">
+    <div class="diagram-label">Séquence RDP via F5 — Mode SSL Passthrough (solution recommandée)</div>
+    <svg width="100%" viewBox="0 0 780 295" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="mp" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="#A78BFA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+      <!-- Entities -->
+      <rect x="20" y="28" width="158" height="48" rx="8" fill="#0D1D35" stroke="#5B9CF6" stroke-width="1.2"/>
+      <text x="99" y="48" text-anchor="middle" font-family="Sora,sans-serif" font-size="13" font-weight="600" fill="#DDE6F5">Client 25H2</text>
+      <text x="99" y="65" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#3D5E8C">domaine ygie</text>
+
+      <rect x="308" y="28" width="158" height="48" rx="8" fill="#0A0E1A" stroke="rgba(255,255,255,0.15)" stroke-width="1" stroke-dasharray="5 3"/>
+      <text x="387" y="48" text-anchor="middle" font-family="Sora,sans-serif" font-size="12" font-weight="500" fill="#6E7D95">F5 VIP (yres)</text>
+      <text x="387" y="66" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#2E3C52">transit L4 opaque</text>
+
+      <rect x="596" y="28" width="158" height="48" rx="8" fill="#071E19" stroke="#34D399" stroke-width="1.2"/>
+      <text x="675" y="48" text-anchor="middle" font-family="Sora,sans-serif" font-size="13" font-weight="600" fill="#DDE6F5">VDI ycam</text>
+      <text x="675" y="65" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#1A5C4A">domaine ycam</text>
+
+      <!-- Lifelines -->
+      <line x1="99" y1="76" x2="99" y2="230" stroke="rgba(255,255,255,0.1)" stroke-width="1" stroke-dasharray="5 5"/>
+      <line x1="387" y1="76" x2="387" y2="230" stroke="rgba(255,255,255,0.05)" stroke-width="1" stroke-dasharray="3 7"/>
+      <line x1="675" y1="76" x2="675" y2="230" stroke="rgba(255,255,255,0.1)" stroke-width="1" stroke-dasharray="5 5"/>
+
+      <!-- Through TLS -->
+      <text x="387" y="96" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11" fill="#A78BFA" letter-spacing="0.05em">── FLUX TLS BOUT EN BOUT ──</text>
+      <text x="387" y="114" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="12" fill="#6E7D95">ClientHello TLS (transit F5 transparent)</text>
+      <line x1="99" y1="122" x2="675" y2="122" stroke="#A78BFA" stroke-width="1.5" marker-end="url(#mp)"/>
+      <circle cx="387" cy="122" r="4.5" fill="#060A12" stroke="#A78BFA" stroke-width="1.5"/>
+
+      <text x="387" y="144" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="12" fill="#34D399">ServerHello + cert VDI PKI (EKU RDP présent) ✓</text>
+      <line x1="675" y1="152" x2="99" y2="152" stroke="#A78BFA" stroke-width="1.5" marker-end="url(#mp)"/>
+      <circle cx="387" cy="152" r="4.5" fill="#060A12" stroke="#A78BFA" stroke-width="1.5"/>
+
+      <!-- F5 label -->
+      <rect x="300" y="164" width="174" height="36" rx="6" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+      <text x="387" y="179" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="11" fill="#2E3C52">F5 : forwarding TCP pur</text>
+      <text x="387" y="193" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="11" fill="#2E3C52">Pas d'inspection TLS — flux opaque</text>
+
+      <!-- Results -->
+      <rect x="13" y="210" width="172" height="46" rx="7" fill="rgba(52,211,153,0.09)" stroke="rgba(52,211,153,0.35)" stroke-width="1"/>
+      <text x="99" y="229" text-anchor="middle" font-family="Sora,sans-serif" font-size="13" font-weight="700" fill="#34D399">Connexion OK</text>
+      <text x="99" y="246" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="#22A076">Cert VDI trusté ✓ — EKU ok ✓</text>
+
+      <rect x="589" y="210" width="172" height="46" rx="7" fill="rgba(52,211,153,0.07)" stroke="rgba(52,211,153,0.22)" stroke-width="1"/>
+      <text x="675" y="229" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="12" fill="#34D399">Cert PKI + EKU RDP ✓</text>
+      <text x="675" y="246" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="12" fill="#34D399">Présenté directement</text>
+    </svg>
+  </div>
+
+  <h3>Bridging vs Passthrough — différences clés</h3>
+  <table class="tbl">
+    <tr>
+      <th>Aspect</th>
+      <th class="th-r">SSL Bridging (actuel)</th>
+      <th class="th-g">SSL Passthrough (cible)</th>
+    </tr>
+    <tr>
+      <td>Couche opérationnelle</td>
+      <td><span class="va">Layer 7 — applicatif</span></td>
+      <td><span class="vg">Layer 4 — transport</span></td>
+    </tr>
+    <tr>
+      <td>Sessions TLS</td>
+      <td><span class="vr">2 sessions distinctes</span></td>
+      <td><span class="vg">1 session bout en bout</span></td>
+    </tr>
+    <tr>
+      <td>Cert vu par le client</td>
+      <td><span class="vr">Cert F5 (sans EKU RDP)</span></td>
+      <td><span class="vg">Cert VDI (PKI interne, EKU ok)</span></td>
+    </tr>
+    <tr>
+      <td>Inspection du contenu</td>
+      <td><span class="vm">Oui — F5 déchiffre le flux RDP</span></td>
+      <td><span class="vg">Non — flux opaque</span></td>
+    </tr>
+    <tr>
+      <td>Performance</td>
+      <td><span class="vm">Standard (CPU SSL offload)</span></td>
+      <td><span class="vg">Meilleure (FastL4 hardware ASIC)</span></td>
+    </tr>
+    <tr>
+      <td>Load balancing applicatif</td>
+      <td><span class="vm">L7 possible (cookie, header)</span></td>
+      <td><span class="va">L4 uniquement (IP src, hash)</span></td>
+    </tr>
+    <tr>
+      <td>Modification côté VDI</td>
+      <td><span class="vm">Aucune</span></td>
+      <td><span class="vg">Aucune</span></td>
+    </tr>
+  </table>
+</section>
+
+<!-- ═══ SOLUTIONS ═══ -->
+<section class="section">
+  <div class="section-label">06 — Solutions disponibles</div>
+  <h2>Trois options, une recommandation</h2>
+
+  <div class="sol sol-g">
+    <div class="sol-head">
+      <div class="sol-rank">01</div>
+      <div>
+        <div class="sol-badges"><span class="badge b-green">Recommandée</span><span class="badge b-green">Pérenne</span><span class="badge b-green">Non-invasive</span></div>
+        <div class="sol-title" style="margin-top:6px;">F5 en SSL Passthrough — Performance Layer 4 / FastL4</div>
+      </div>
+    </div>
+    <div class="sol-body">
+      <ul class="pros">
+        <h5>Pour</h5>
+        <li>Résout définitivement le problème d'EKU absent</li>
+        <li>Aucune modification côté VDI ou PKI</li>
+        <li>Meilleures performances (FastL4 hardware)</li>
+        <li>Sécurité renforcée : pas de déchiffrement intermédiaire</li>
+        <li>Compatible 25H2 nativement et durablement</li>
+      </ul>
+      <ul class="cons">
+        <h5>Contraintes</h5>
+        <li>Perte de visibilité L7 sur le flux RDP</li>
+        <li>Persistence uniquement en Source Address Affinity</li>
+        <li>Clients externes non-managed : CA interne toujours un sujet distinct</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="sol sol-b">
+    <div class="sol-head">
+      <div class="sol-rank">02</div>
+      <div>
+        <div class="sol-badges"><span class="badge b-blue">Complexe</span><span class="badge b-blue">Clients managés uniquement</span></div>
+        <div class="sol-title" style="margin-top:6px;">Certificat PKI avec EKU Remote Desktop Authentication sur le F5</div>
+      </div>
+    </div>
+    <div class="sol-body">
+      <ul class="pros">
+        <h5>Pour</h5>
+        <li>Conserve la visibilité L7 du F5</li>
+        <li>Garde le SSL Bridging et la persistence L7</li>
+        <li>Pas de changement de type de VS</li>
+      </ul>
+      <ul class="cons">
+        <h5>Contraintes</h5>
+        <li>Nécessite un template PKI avec OID RDP (OID 1.3.6.1.4.1.311.54.1.2)</li>
+        <li>CA émettrice doit être trustée par tous les clients</li>
+        <li>Inapplicable aux clients externes non-managés</li>
+        <li>Les CA publiques (DigiCert, etc.) n'émettent pas cet EKU</li>
+        <li>GPO nécessaire pour distribuer la CA aux postes clients</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="sol sol-a">
+    <div class="sol-head">
+      <div class="sol-rank">03</div>
+      <div>
+        <div class="sol-badges"><span class="badge b-amber">Court terme</span><span class="badge b-amber">Workaround temporaire</span><span class="badge b-red">Risque sécurité</span></div>
+        <div class="sol-title" style="margin-top:6px;">GPO — Assouplissement de la validation TLS côté client 25H2</div>
+      </div>
+    </div>
+    <div class="sol-body">
+      <ul class="pros">
+        <h5>Pour</h5>
+        <li>Déploiement immédiat sans toucher au F5</li>
+        <li>Réversible instantanément</li>
+        <li>Permet de débloquer les utilisateurs en urgence</li>
+      </ul>
+      <ul class="cons">
+        <h5>Contraintes</h5>
+        <li>Réintroduit la vulnérabilité que 25H2 corrige</li>
+        <li>Incompatible audit de sécurité bancaire</li>
+        <li>Inapplicable aux postes non-managés (prod externe)</li>
+        <li>À n'utiliser que le temps du change F5</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout callout-amber">
+    <p><strong>Chemin GPO (solution 3 — workaround uniquement) :</strong> <code style="font-family:var(--mono);font-size:12px;color:var(--amber)">Computer Configuration › Administrative Templates › Windows Components › Remote Desktop Services › Remote Desktop Connection Client › Configure Authentication for the client</code> → <em>Warn me if authentication fails</em>. Déployer ciblé sur les postes 25H2 uniquement, avec une date d'expiration dans la GPO.</p>
+  </div>
+</section>
+
+<!-- ═══ CONFIGURATION F5 ═══ -->
+<section class="section">
+  <div class="section-label">07 — Configuration exacte</div>
+  <h2>Mise en œuvre du SSL Passthrough sur F5 BIG-IP</h2>
+
+  <div class="callout callout-amber">
+    <p><strong>Prérequis :</strong> Cette configuration s'applique au Virtual Server existant qui porte la VIP RDP vers les VDI. Le pool et ses membres restent strictement inchangés. Un change doit être ouvert et la modification effectuée en fenêtre de maintenance.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-n">1</div>
+    <div class="step-c">
+      <h4>Modifier le type du Virtual Server</h4>
+      <p>Changer le type de <span class="ic">Standard</span> à <span class="ig">Performance (Layer 4)</span>. C'est la modification fondamentale qui active le mode passthrough transparent.</p>
+      <div class="code-wrap">
+        <div class="code-top">TMSH — F5 BIG-IP</div>
+        <pre>tmsh modify ltm virtual &lt;nom-du-vs&gt; \
+    ip-protocol tcp \
+    profiles replace-all-with { fastL4 { } }</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-n">2</div>
+    <div class="step-c">
+      <h4>Supprimer les profils SSL Client et Server</h4>
+      <p>Retirer le Client SSL Profile et le Server SSL Profile du Virtual Server. En mode FastL4, ces profils sont incompatibles et doivent être absents.</p>
+      <div class="code-wrap">
+        <div class="code-top">Interface GUI — Local Traffic › Virtual Servers › [NomVS]</div>
+        <pre>Onglet Properties :
+  Type                        : Performance (Layer 4)
+
+Onglet SSL Profiles (Client) :
+  Selected profiles           : [vide — retirer tous les profils]
+
+Onglet SSL Profiles (Server) :
+  Selected profiles           : [vide — retirer tous les profils]</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-n">3</div>
+    <div class="step-c">
+      <h4>Appliquer le profil FastL4</h4>
+      <p>Le profil <span class="ig">fastL4</span> est le profil système F5 qui active le forwarding matériel Layer 4 via ASIC. Il remplace le profil TCP standard.</p>
+      <div class="code-wrap">
+        <div class="code-top">TMSH</div>
+        <pre>tmsh modify ltm virtual &lt;nom-du-vs&gt; \
+    profiles add { fastL4 { context all } }
+
+# Vérification de la configuration résultante
+tmsh show ltm virtual &lt;nom-du-vs&gt; detail</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-n">4</div>
+    <div class="step-c">
+      <h4>Configurer la persistence Source Address Affinity (recommandé)</h4>
+      <p>En passthrough L4, la persistence ne peut pas être basée sur le cookie (L7). Utiliser la <strong>Source Address Affinity</strong> pour s'assurer que les reconnexions d'un même client vont sur la même VDI — essentiel pour la continuité des sessions VDI.</p>
+      <div class="code-wrap">
+        <div class="code-top">TMSH — Création et application du profil de persistence</div>
+        <pre>tmsh create ltm persistence source-addr rdp-src-affinity {
+    timeout 3600
+    match-across-services enabled
+    match-across-virtuals disabled
+}
+
+tmsh modify ltm virtual &lt;nom-du-vs&gt; {
+    persist replace-all-with {
+        rdp-src-affinity { default yes }
+    }
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-n">5</div>
+    <div class="step-c">
+      <h4>Vérifier le health monitor du pool</h4>
+      <p>S'assurer que le pool utilise un health monitor TCP sur le port 3389 uniquement. Un monitor HTTPS ou SSL tenterait une handshake TLS depuis le F5 vers les VDI, ce qui peut perturber le passthrough.</p>
+      <div class="code-wrap">
+        <div class="code-top">TMSH — Vérification et création du monitor TCP</div>
+        <pre>tmsh show ltm pool &lt;nom-du-pool&gt; members detail
+
+# Si le monitor actuel est HTTPS/SSL, le remplacer :
+tmsh create ltm monitor tcp rdp-tcp-monitor {
+    interval 10
+    timeout  31
+    dest     *.3389
+}
+
+tmsh modify ltm pool &lt;nom-du-pool&gt; {
+    monitor rdp-tcp-monitor
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-n">6</div>
+    <div class="step-c">
+      <h4>Sauvegarder et valider</h4>
+      <div class="code-wrap">
+        <div class="code-top">TMSH — Sauvegarde de la configuration</div>
+        <pre>tmsh save sys config
+
+# Test de connexion depuis un poste 25H2
+# Le certificat présenté doit désormais être celui de la VDI,
+# et non plus celui du F5.</pre>
+      </div>
+    </div>
+  </div>
+
+  <h3>Récapitulatif avant / après</h3>
+  <table class="tbl">
+    <tr>
+      <th style="width:190px">Paramètre</th>
+      <th class="th-r">Avant — SSL Bridging</th>
+      <th class="th-g">Après — SSL Passthrough</th>
+    </tr>
+    <tr>
+      <td>VS Type</td>
+      <td><span class="vr">Standard</span></td>
+      <td><span class="vg">Performance (Layer 4)</span></td>
+    </tr>
+    <tr>
+      <td>Client SSL Profile</td>
+      <td><span class="vr">rdp-client-ssl (présent)</span></td>
+      <td><span class="vg">Aucun</span></td>
+    </tr>
+    <tr>
+      <td>Server SSL Profile</td>
+      <td><span class="vr">rdp-server-ssl (présent)</span></td>
+      <td><span class="vg">Aucun</span></td>
+    </tr>
+    <tr>
+      <td>L4 / TCP Profile</td>
+      <td><span class="vm">tcp (standard)</span></td>
+      <td><span class="vg">fastL4</span></td>
+    </tr>
+    <tr>
+      <td>Persistence</td>
+      <td><span class="vm">Cookie / Any (L7)</span></td>
+      <td><span class="va">Source Address Affinity (L4)</span></td>
+    </tr>
+    <tr>
+      <td>Default Pool</td>
+      <td><span class="vm">pool-vdi-rdp (inchangé)</span></td>
+      <td><span class="vm">pool-vdi-rdp (inchangé)</span></td>
+    </tr>
+    <tr>
+      <td>Health Monitor</td>
+      <td><span class="vm">tcp / https</span></td>
+      <td><span class="vg">tcp :3389 uniquement</span></td>
+    </tr>
+    <tr>
+      <td>Cert vu par client</td>
+      <td><span class="vr">Cert F5 (EKU RDP absent)</span></td>
+      <td><span class="vg">Cert VDI PKI (EKU RDP présent)</span></td>
+    </tr>
+  </table>
+</section>
+
+<!-- ═══ ROADMAP ═══ -->
+<section class="section">
+  <div class="section-label">08 — Plan d'action</div>
+  <h2>Recommandations & roadmap</h2>
+
+  <div class="callout callout-red">
+    <p><strong>Point critique production :</strong> Le passthrough résout le problème d'EKU manquant. Mais si les clients externes de prod ne font pas confiance à votre PKI interne (CA absente de leur Trusted Root store), ils recevront une erreur "CA non reconnue" distincte. Ce point doit être qualifié avant tout déploiement en prod.</p>
+  </div>
+
+  <div class="roadmap">
+    <div class="rm-col">
+      <div class="rm-period">Court terme — J+0 à J+5</div>
+      <h4>Déblocage homologation</h4>
+      <ul>
+        <li>Ouvrir un change F5 pour le VS d'homologation</li>
+        <li>Passer le VS en Performance L4 / FastL4</li>
+        <li>Supprimer Client SSL et Server SSL profiles</li>
+        <li>Valider la connexion depuis le poste 25H2 ygie</li>
+        <li>Optionnel : GPO workaround en urgence si blocage utilisateurs critique</li>
+      </ul>
+    </div>
+    <div class="rm-col">
+      <div class="rm-period">Moyen terme — J+5 à J+30</div>
+      <h4>Qualification production</h4>
+      <ul>
+        <li>Qualifier la confiance PKI des clients externes prod</li>
+        <li>Si non trustée : évaluer CA croisée ou certificat issu d'une racine Windows-native</li>
+        <li>Préparer le change F5 pour le VS de prod (zcam)</li>
+        <li>Tester la persistence Source Address Affinity sur les VDI</li>
+        <li>Valider le health monitor TCP:3389</li>
+      </ul>
+    </div>
+    <div class="rm-col">
+      <div class="rm-period">Long terme — J+30+</div>
+      <h4>Pérennisation</h4>
+      <ul>
+        <li>Déployer sur l'ensemble des VS RDP de production</li>
+        <li>Documenter l'architecture passthrough dans la CMDB</li>
+        <li>Mettre à jour les runbooks d'exploitation F5</li>
+        <li>Intégrer dans les critères d'acceptation des futures mises à jour Windows</li>
+        <li>Revue PKI globale si clients multi-domaines non-managés</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<footer class="footer">
+  <p>Infrastructure VDI · Windows 11 25H2 · F5 BIG-IP · PKI interne</p>
+  <p>Document technique — Usage interne · Mai 2026</p>
+</footer>
+
+</div>
+</body>
+</html>
