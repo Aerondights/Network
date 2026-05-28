@@ -1,0 +1,1704 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>RDP via VIP F5 — Diagnostic complet | 25H2 ↔ 23H2 inter-domaines</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg-primary: #080c12;
+  --bg-secondary: #0d1420;
+  --bg-card: #111827;
+  --bg-card-hover: #162033;
+  --border: #1e2d45;
+  --border-bright: #2a4166;
+  --text-primary: #e8f0fe;
+  --text-secondary: #8da9cc;
+  --text-muted: #4a6280;
+  --accent-cyan: #00d4ff;
+  --accent-blue: #3b82f6;
+  --accent-green: #10b981;
+  --accent-orange: #f59e0b;
+  --accent-red: #ef4444;
+  --accent-purple: #8b5cf6;
+  --accent-pink: #ec4899;
+  --gradient-header: linear-gradient(135deg, #0a1628 0%, #0d2040 50%, #0a1628 100%);
+  --nav-width: 290px;
+  --radius: 8px;
+  --shadow: 0 4px 24px rgba(0,0,0,0.6);
+}
+[data-theme="light"] {
+  --bg-primary: #f0f4f8;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #eef2f7;
+  --border: #d1dce8;
+  --border-bright: #a8bfd4;
+  --text-primary: #0f1923;
+  --text-secondary: #3a5577;
+  --text-muted: #7a96b0;
+  --accent-cyan: #0098c3;
+  --accent-blue: #2563eb;
+  --gradient-header: linear-gradient(135deg, #dce8f5 0%, #c8ddef 50%, #dce8f5 100%);
+  --shadow: 0 4px 24px rgba(0,0,0,0.12);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Sora', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: background 0.3s, color 0.3s;
+}
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
+
+#app { display: flex; min-height: 100vh; }
+#sidebar {
+  width: var(--nav-width);
+  min-height: 100vh;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  position: fixed; top: 0; left: 0;
+  display: flex; flex-direction: column;
+  z-index: 100; transition: transform 0.3s, background 0.3s;
+}
+#main-content { margin-left: var(--nav-width); flex: 1; min-height: 100vh; display: flex; flex-direction: column; }
+
+.sidebar-logo {
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.logo-icon {
+  width: 38px; height: 38px;
+  background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; color: #fff; flex-shrink: 0;
+}
+.logo-text { font-size: 12px; font-weight: 700; color: var(--text-primary); line-height: 1.3; }
+.logo-sub { font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+
+.nav-section-label {
+  padding: 14px 20px 6px;
+  font-size: 9px; font-weight: 700; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 20px;
+  cursor: pointer; color: var(--text-secondary);
+  font-size: 12.5px; font-weight: 400;
+  transition: all 0.2s;
+  border-left: 3px solid transparent;
+  text-decoration: none; position: relative;
+}
+.nav-item:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+.nav-item.active {
+  background: rgba(239,68,68,0.07);
+  color: var(--accent-orange);
+  border-left-color: var(--accent-orange);
+  font-weight: 600;
+}
+.nav-item .nav-icon { width: 16px; text-align: center; font-size: 13px; flex-shrink: 0; }
+.nav-badge {
+  margin-left: auto; font-size: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 2px 6px; border-radius: 3px; font-weight: 700;
+}
+.nav-badge.crit { background: rgba(239,68,68,0.15); color: var(--accent-red); }
+.nav-badge.sol { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+.nav-badge.diag { background: rgba(245,158,11,0.15); color: var(--accent-orange); }
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.theme-toggle { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--text-secondary); }
+.toggle-btn { display: flex; background: var(--bg-card); border: 1px solid var(--border); border-radius: 20px; padding: 3px; gap: 2px; cursor: pointer; }
+.toggle-opt { padding: 3px 8px; border-radius: 14px; font-size: 10px; cursor: pointer; transition: all 0.2s; color: var(--text-muted); }
+.toggle-opt.active { background: var(--accent-orange); color: #000; font-weight: 700; }
+.export-btn {
+  width: 100%; padding: 9px;
+  background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));
+  border: none; border-radius: 6px; cursor: pointer;
+  color: #fff; font-weight: 600; font-size: 12px;
+  transition: opacity 0.2s; letter-spacing: 0.5px;
+}
+.export-btn:hover { opacity: 0.85; }
+
+#page-header {
+  background: var(--gradient-header);
+  border-bottom: 1px solid var(--border);
+  padding: 40px 48px 36px;
+  position: relative; overflow: hidden;
+}
+#page-header::before {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(239,68,68,0.025) 40px, rgba(239,68,68,0.025) 41px),
+    radial-gradient(circle at 80% 20%, rgba(245,158,11,0.08), transparent 40%);
+  pointer-events: none;
+}
+.header-meta {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 11px; font-family: 'JetBrains Mono', monospace;
+  color: var(--text-muted); margin-bottom: 16px; flex-wrap: wrap;
+}
+.header-tag {
+  padding: 3px 8px; border-radius: 4px; font-weight: 700; font-size: 10px;
+  letter-spacing: 1px;
+}
+.tag-red { background: rgba(239,68,68,0.15); color: var(--accent-red); border: 1px solid rgba(239,68,68,0.3); }
+.tag-orange { background: rgba(245,158,11,0.12); color: var(--accent-orange); border: 1px solid rgba(245,158,11,0.3); }
+.tag-cyan { background: rgba(0,212,255,0.1); color: var(--accent-cyan); border: 1px solid rgba(0,212,255,0.25); }
+.tag-green { background: rgba(16,185,129,0.12); color: var(--accent-green); border: 1px solid rgba(16,185,129,0.3); }
+
+h1 {
+  font-size: 30px; font-weight: 700;
+  background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-orange) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  line-height: 1.2; margin-bottom: 12px; max-width: 760px;
+}
+.header-sub { font-size: 14.5px; color: var(--text-secondary); max-width: 720px; line-height: 1.65; }
+.header-stats { display: flex; gap: 32px; margin-top: 28px; flex-wrap: wrap; }
+.stat-item { display: flex; flex-direction: column; gap: 2px; }
+.stat-val { font-size: 20px; font-weight: 700; color: var(--accent-orange); font-family: 'JetBrains Mono', monospace; }
+.stat-lbl { font-size: 11px; color: var(--text-muted); letter-spacing: 0.5px; }
+
+.section {
+  padding: 48px 48px;
+  border-bottom: 1px solid var(--border);
+}
+.section-header {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 24px;
+}
+.section-num {
+  width: 36px; height: 36px; border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0;
+  font-family: 'JetBrains Mono', monospace;
+}
+.section-title { font-size: 22px; font-weight: 700; color: var(--text-primary); line-height: 1.3; }
+.section-desc { font-size: 14px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 22px; max-width: 820px; }
+
+.sub-title {
+  font-size: 16px; font-weight: 700; color: var(--text-primary);
+  margin: 28px 0 14px; padding-left: 12px;
+  border-left: 3px solid var(--accent-orange);
+}
+
+.cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap: 16px; margin-bottom: 20px; }
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  transition: all 0.2s;
+}
+.card:hover { border-color: var(--border-bright); transform: translateY(-2px); box-shadow: var(--shadow); }
+.card-icon { font-size: 20px; margin-bottom: 8px; }
+.card-title { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; }
+.card-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.55; }
+.card.danger { border-color: rgba(239,68,68,0.25); background: rgba(239,68,68,0.04); }
+.card.success { border-color: rgba(16,185,129,0.25); background: rgba(16,185,129,0.04); }
+.card.warning { border-color: rgba(245,158,11,0.25); background: rgba(245,158,11,0.04); }
+.card.info { border-color: rgba(59,130,246,0.25); background: rgba(59,130,246,0.04); }
+.card.purple { border-color: rgba(139,92,246,0.25); background: rgba(139,92,246,0.04); }
+
+.diagram-wrapper {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+.diagram-toolbar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap; background: rgba(0,0,0,0.1);
+}
+.diagram-toolbar-label {
+  font-size: 11px; font-family: 'JetBrains Mono', monospace;
+  color: var(--text-muted); margin-right: 4px;
+}
+.layer-btn {
+  padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600;
+  cursor: pointer; border: 1px solid transparent; transition: all 0.2s;
+  font-family: 'JetBrains Mono', monospace;
+}
+.layer-btn.on { border-color: currentColor; opacity: 1; }
+.layer-btn.off { opacity: 0.35; border-color: var(--border); color: var(--text-muted); }
+.lb-net { color: #3b82f6; }
+.lb-tls { color: #8b5cf6; }
+.lb-cred { color: #ef4444; }
+.lb-rdp { color: #f59e0b; }
+.lb-fail { color: #ec4899; }
+.anim-btn {
+  margin-left: auto; padding: 4px 12px; border-radius: 4px;
+  font-size: 11px; font-weight: 700; cursor: pointer; border: none;
+  background: linear-gradient(90deg, var(--accent-red), var(--accent-orange));
+  color: #fff; letter-spacing: 0.5px; transition: opacity 0.2s;
+}
+.anim-btn:hover { opacity: 0.85; }
+.phase-btn {
+  padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer;
+  border: 1px solid var(--border); background: transparent; color: var(--text-secondary);
+  transition: all 0.2s; font-weight: 500;
+}
+.phase-btn.active { background: rgba(245,158,11,0.1); border-color: var(--accent-orange); color: var(--accent-orange); font-weight: 700; }
+.diagram-svg-area {
+  padding: 20px;
+  overflow-x: auto;
+  min-height: 400px;
+  display: flex; justify-content: center;
+}
+.diagram-svg-area svg { max-width: 100%; height: auto; }
+
+.compare-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+  border-radius: var(--radius); overflow: hidden;
+}
+.compare-table th {
+  padding: 11px 14px; text-align: left;
+  background: rgba(0,0,0,0.2); font-size: 11px;
+  font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--text-muted); border-bottom: 1px solid var(--border);
+}
+.compare-table th:nth-child(2) { color: var(--accent-cyan); }
+.compare-table th:nth-child(3) { color: var(--accent-orange); }
+.compare-table th:nth-child(4) { color: var(--accent-red); }
+.compare-table td {
+  padding: 11px 14px; border-bottom: 1px solid var(--border);
+  color: var(--text-secondary); vertical-align: top; font-size: 12.5px; line-height: 1.55;
+}
+.compare-table tr:last-child td { border-bottom: none; }
+.compare-table tr:hover td { background: rgba(255,255,255,0.02); }
+.compare-table td:first-child { font-weight: 600; color: var(--text-primary); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+.change-chip {
+  display: inline-block; padding: 2px 7px; border-radius: 3px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.5px; font-family: 'JetBrains Mono', monospace;
+}
+.chip-red { background: rgba(239,68,68,0.15); color: var(--accent-red); }
+.chip-green { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+.chip-orange { background: rgba(245,158,11,0.15); color: var(--accent-orange); }
+.chip-blue { background: rgba(59,130,246,0.15); color: var(--accent-blue); }
+.chip-cyan { background: rgba(0,212,255,0.1); color: var(--accent-cyan); }
+.chip-purple { background: rgba(139,92,246,0.15); color: var(--accent-purple); }
+
+.code-block {
+  background: rgba(0,0,0,0.4);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-cyan);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; line-height: 1.8;
+  color: var(--text-secondary);
+  overflow-x: auto; margin-bottom: 16px;
+  white-space: pre;
+}
+.code-block .k { color: var(--accent-cyan); }
+.code-block .v { color: var(--accent-green); }
+.code-block .c { color: var(--text-muted); font-style: italic; }
+.code-block .w { color: var(--accent-orange); font-weight: 700; }
+.code-block .r { color: var(--accent-red); font-weight: 700; }
+.code-block .s { color: #ec4899; }
+
+.alert {
+  display: flex; gap: 12px; padding: 14px 16px;
+  border-radius: var(--radius); margin-bottom: 18px;
+  font-size: 13px; line-height: 1.6;
+}
+.alert-danger { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); }
+.alert-success { background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); }
+.alert-warning { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.25); }
+.alert-info { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.25); }
+.alert-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+.alert-body strong { font-weight: 700; display: block; margin-bottom: 4px; }
+
+.solution-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px 24px;
+  margin-bottom: 16px;
+  position: relative;
+}
+.solution-card.primary { border-left: 4px solid var(--accent-green); }
+.solution-card.secondary { border-left: 4px solid var(--accent-orange); }
+.solution-card.tertiary { border-left: 4px solid var(--accent-blue); }
+.solution-card.workaround { border-left: 4px solid var(--accent-purple); background: rgba(139,92,246,0.04); }
+.sol-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.sol-num {
+  width: 28px; height: 28px; border-radius: 8px;
+  background: var(--bg-card-hover); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace;
+}
+.sol-title { font-size: 15px; font-weight: 700; color: var(--text-primary); flex: 1; min-width: 250px; }
+.sol-difficulty {
+  font-size: 10px; padding: 3px 8px; border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace; font-weight: 700; letter-spacing: 0.5px;
+}
+.sd-easy { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+.sd-medium { background: rgba(245,158,11,0.15); color: var(--accent-orange); }
+.sd-hard { background: rgba(239,68,68,0.15); color: var(--accent-red); }
+.sol-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.65; margin-bottom: 12px; }
+
+.step-list { margin: 12px 0; padding-left: 0; list-style: none; counter-reset: step; }
+.step-list li {
+  position: relative; padding: 8px 0 8px 32px;
+  font-size: 13px; color: var(--text-secondary); line-height: 1.6;
+  border-bottom: 1px dashed var(--border);
+}
+.step-list li:last-child { border-bottom: none; }
+.step-list li::before {
+  content: counter(step);
+  counter-increment: step;
+  position: absolute; left: 0; top: 8px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--bg-card-hover); border: 1px solid var(--border-bright);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; color: var(--accent-orange);
+  font-family: 'JetBrains Mono', monospace;
+}
+.step-list strong { color: var(--text-primary); }
+.step-list code {
+  background: rgba(0,0,0,0.4); color: var(--accent-cyan);
+  padding: 1px 6px; border-radius: 3px; font-size: 11.5px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.topology-svg { background: linear-gradient(180deg, #050810 0%, #0a1220 100%); border-radius: 8px; }
+
+#hamburger {
+  display: none; position: fixed; top: 14px; left: 14px; z-index: 200;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 6px; padding: 8px 10px; cursor: pointer;
+  font-size: 18px; color: var(--text-primary);
+}
+.sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 99; }
+
+@media (max-width: 900px) {
+  #sidebar { transform: translateX(-100%); }
+  #sidebar.open { transform: translateX(0); }
+  #main-content { margin-left: 0; }
+  #hamburger { display: block; }
+  .sidebar-overlay.open { display: block; }
+  .section { padding: 32px 20px; }
+  #page-header { padding: 50px 20px 32px; }
+  h1 { font-size: 22px; }
+  .header-stats { gap: 16px; }
+  .stat-val { font-size: 16px; }
+}
+
+@media print {
+  #sidebar { display: none !important; }
+  #hamburger { display: none !important; }
+  #main-content { margin-left: 0 !important; }
+  .diagram-toolbar { display: none !important; }
+  .section { page-break-inside: avoid; padding: 24px 32px; }
+  body { background: white !important; color: black !important; }
+  .section { border-color: #ddd !important; }
+  .code-block, .card, .solution-card { page-break-inside: avoid; }
+}
+
+@keyframes flow-anim { from { stroke-dashoffset: 500; } to { stroke-dashoffset: 0; } }
+@keyframes pulse-dot { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
+@keyframes fade-in-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes blink-fail { 0%,100% { opacity: 0.5; } 50% { opacity: 1; filter: drop-shadow(0 0 4px var(--accent-red)); } }
+.section { animation: fade-in-up 0.4s ease both; }
+.fail-marker { animation: blink-fail 1.5s infinite; }
+</style>
+</head>
+<body>
+<div id="app">
+
+<nav id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">⚠</div>
+    <div>
+      <div class="logo-text">Diagnostic RDP</div>
+      <div class="logo-sub">VIP F5 · 25H2 ↔ 23H2</div>
+    </div>
+  </div>
+
+  <div class="nav-section-label">Sommaire</div>
+  <a class="nav-item active" href="#contexte" onclick="setActive(this)">
+    <span class="nav-icon">🎯</span> Contexte &amp; Topologie
+  </a>
+  <a class="nav-item" href="#rdp-23h2" onclick="setActive(this)">
+    <span class="nav-icon">🟢</span> RDP en 23H2 (cible)
+  </a>
+  <a class="nav-item" href="#rdp-25h2" onclick="setActive(this)">
+    <span class="nav-icon">🔵</span> RDP en 25H2 (source)
+  </a>
+  <a class="nav-item" href="#f5-arch" onclick="setActive(this)">
+    <span class="nav-icon">⚖️</span> Architecture F5 TCP Bridge
+  </a>
+  <a class="nav-item" href="#analyse" onclick="setActive(this)">
+    <span class="nav-icon">🔍</span> Analyse du problème
+    <span class="nav-badge crit">CRIT</span>
+  </a>
+  <a class="nav-item" href="#diagnostic" onclick="setActive(this)">
+    <span class="nav-icon">🩺</span> Diagnostic étape par étape
+    <span class="nav-badge diag">11</span>
+  </a>
+  <a class="nav-item" href="#solutions" onclick="setActive(this)">
+    <span class="nav-icon">🛠️</span> Solutions complètes
+    <span class="nav-badge sol">8</span>
+  </a>
+  <a class="nav-item" href="#plan-action" onclick="setActive(this)">
+    <span class="nav-icon">📋</span> Plan d'action recommandé
+  </a>
+  <a class="nav-item" href="#annexes" onclick="setActive(this)">
+    <span class="nav-icon">📎</span> Annexes techniques
+  </a>
+
+  <div class="sidebar-footer">
+    <div class="theme-toggle">
+      <span style="font-size:12px">Thème</span>
+      <div class="toggle-btn">
+        <span class="toggle-opt active" id="btn-dark" onclick="setTheme('dark')">Dark</span>
+        <span class="toggle-opt" id="btn-light" onclick="setTheme('light')">Light</span>
+      </div>
+    </div>
+    <button class="export-btn" onclick="exportPDF()">⬇ Exporter en PDF</button>
+  </div>
+</nav>
+<div class="sidebar-overlay" id="overlay" onclick="closeSidebar()"></div>
+<button id="hamburger" onclick="toggleSidebar()">☰</button>
+
+<div id="main-content">
+
+<header id="page-header">
+  <div class="header-meta">
+    <span class="header-tag tag-red">DIAGNOSTIC TECHNIQUE</span>
+    <span class="header-tag tag-orange">RDP · NLA · CredSSP</span>
+    <span class="header-tag tag-cyan">F5 BIG-IP · TCP Bridge</span>
+    <span class="header-tag tag-green">Inter-domaines zcam ↔ zres</span>
+  </div>
+  <h1>Connexion RDP via VIP F5 en TCP Bridge<br/>entre Windows 11 25H2 et 23H2 inter-domaines</h1>
+  <p class="header-sub">Analyse complète du flux RDP, identification des causes racines de l'échec de connexion, et catalogue exhaustif des solutions techniques. Couvre les enjeux SPN/Kerberos, certificats EKU Remote Desktop Authentication, durcissement 25H2, et configuration F5.</p>
+  <div class="header-stats">
+    <div class="stat-item"><div class="stat-val">3</div><div class="stat-lbl">Composants impliqués</div></div>
+    <div class="stat-item"><div class="stat-val">2</div><div class="stat-lbl">Domaines AD distincts</div></div>
+    <div class="stat-item"><div class="stat-val">11</div><div class="stat-lbl">Étapes de diagnostic</div></div>
+    <div class="stat-item"><div class="stat-val">8</div><div class="stat-lbl">Solutions proposées</div></div>
+    <div class="stat-item"><div class="stat-val">25H2</div><div class="stat-lbl">Client durci (KB5083769)</div></div>
+  </div>
+</header>
+
+<section class="section" id="contexte">
+  <div class="section-header">
+    <div class="section-num">01</div>
+    <div class="section-title">Contexte technique &amp; Topologie</div>
+  </div>
+  <p class="section-desc">Architecture cible : un poste source Windows 11 25H2 (domaine <code style="color:var(--accent-cyan);font-family:'JetBrains Mono',monospace;background:rgba(0,0,0,0.3);padding:1px 6px;border-radius:3px">zcam</code>) initie une connexion RDP via une VIP F5 BIG-IP en TCP bridge (objet réseau dans le domaine <code style="color:var(--accent-orange);font-family:'JetBrains Mono',monospace;background:rgba(0,0,0,0.3);padding:1px 6px;border-radius:3px">zres</code>) vers un poste cible Windows 11 23H2 (domaine <code style="color:var(--accent-cyan);font-family:'JetBrains Mono',monospace;background:rgba(0,0,0,0.3);padding:1px 6px;border-radius:3px">zcam</code>). La connexion échoue, sans trafic visible entre la VIP et la cible dans la trace réseau.</p>
+
+  <div class="diagram-wrapper">
+    <div class="diagram-toolbar">
+      <span class="diagram-toolbar-label">VUE :</span>
+      <button class="phase-btn active" onclick="showTopoView('logical',this)">Logique (domaines)</button>
+      <button class="phase-btn" onclick="showTopoView('flow',this)">Flux réseau</button>
+      <button class="phase-btn" onclick="showTopoView('fail',this)">Points de rupture</button>
+    </div>
+    <div class="diagram-svg-area">
+      <svg id="svg-topology" viewBox="0 0 1000 540" xmlns="http://www.w3.org/2000/svg" class="topology-svg" style="min-width:800px">
+        <defs>
+          <marker id="t-arr" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 9 3.5, 0 7" fill="#3b82f6"/>
+          </marker>
+          <marker id="t-arr-r" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 9 3.5, 0 7" fill="#ef4444"/>
+          </marker>
+          <linearGradient id="zcam-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#0098c3" stop-opacity="0.18"/>
+            <stop offset="100%" stop-color="#0098c3" stop-opacity="0.04"/>
+          </linearGradient>
+          <linearGradient id="zres-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.18"/>
+            <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.04"/>
+          </linearGradient>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="3" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        <rect x="20" y="30" width="280" height="430" rx="14" fill="url(#zcam-grad)" stroke="#0098c3" stroke-width="1.5" stroke-dasharray="8,4"/>
+        <rect x="700" y="30" width="280" height="430" rx="14" fill="url(#zcam-grad)" stroke="#0098c3" stroke-width="1.5" stroke-dasharray="8,4"/>
+        <text x="160" y="50" text-anchor="middle" font-family="JetBrains Mono" font-size="11" font-weight="700" fill="#00d4ff" letter-spacing="2">DOMAINE ZCAM</text>
+        <text x="840" y="50" text-anchor="middle" font-family="JetBrains Mono" font-size="11" font-weight="700" fill="#00d4ff" letter-spacing="2">DOMAINE ZCAM</text>
+
+        <rect x="320" y="80" width="360" height="280" rx="14" fill="url(#zres-grad)" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="8,4"/>
+        <text x="500" y="100" text-anchor="middle" font-family="JetBrains Mono" font-size="11" font-weight="700" fill="#f59e0b" letter-spacing="2">DOMAINE ZRES</text>
+
+        <g id="topo-trust">
+          <line x1="300" y1="225" x2="320" y2="225" stroke="#ef4444" stroke-width="2" stroke-dasharray="4,3"/>
+          <line x1="680" y1="225" x2="700" y2="225" stroke="#ef4444" stroke-width="2" stroke-dasharray="4,3"/>
+          <text x="310" y="216" text-anchor="middle" font-family="JetBrains Mono" font-size="11" font-weight="700" fill="#ef4444">?</text>
+          <text x="690" y="216" text-anchor="middle" font-family="JetBrains Mono" font-size="11" font-weight="700" fill="#ef4444">?</text>
+          <text x="500" y="73" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#ef4444">⚠ Trust entre zcam et zres ?</text>
+        </g>
+
+        <g id="topo-client">
+          <rect x="50" y="160" width="220" height="160" rx="10" fill="#0d1828" stroke="#00d4ff" stroke-width="2" filter="url(#glow)"/>
+          <rect x="50" y="160" width="220" height="32" rx="10" fill="rgba(0,212,255,0.15)"/>
+          <text x="160" y="181" text-anchor="middle" font-family="JetBrains Mono" font-size="11" font-weight="700" fill="#00d4ff">CLIENT SOURCE</text>
+          <rect x="135" y="200" width="50" height="32" rx="3" fill="none" stroke="#8da9cc" stroke-width="1.5"/>
+          <rect x="143" y="234" width="34" height="3" fill="#8da9cc"/>
+          <text x="160" y="222" text-anchor="middle" font-family="JetBrains Mono" font-size="14" fill="#00d4ff">🖥</text>
+          <text x="160" y="258" text-anchor="middle" font-family="Sora" font-size="12" font-weight="700" fill="#e8f0fe">Windows 11 25H2</text>
+          <text x="160" y="273" text-anchor="middle" font-family="JetBrains Mono" font-size="9.5" fill="#8da9cc">Build 26200.8246</text>
+          <text x="160" y="287" text-anchor="middle" font-family="JetBrains Mono" font-size="9.5" fill="#8da9cc">KB5083769 (durci)</text>
+          <text x="160" y="306" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#00d4ff">DOMAIN: ZCAM</text>
+        </g>
+
+        <g id="topo-vip">
+          <rect x="380" y="170" width="240" height="190" rx="10" fill="#1a1207" stroke="#f59e0b" stroke-width="2" filter="url(#glow)"/>
+          <rect x="380" y="170" width="240" height="32" rx="10" fill="rgba(245,158,11,0.18)"/>
+          <text x="500" y="191" text-anchor="middle" font-family="JetBrains Mono" font-size="11" font-weight="700" fill="#f59e0b">VIP F5 BIG-IP</text>
+          <circle cx="500" cy="226" r="18" fill="none" stroke="#f59e0b" stroke-width="2"/>
+          <text x="500" y="231" text-anchor="middle" font-family="JetBrains Mono" font-size="11" font-weight="700" fill="#f59e0b">F5</text>
+          <text x="500" y="262" text-anchor="middle" font-family="Sora" font-size="12" font-weight="700" fill="#e8f0fe">TCP Bridge Mode</text>
+          <text x="500" y="277" text-anchor="middle" font-family="JetBrains Mono" font-size="9.5" fill="#8da9cc">Port TCP 3389 → backend</text>
+          <text x="500" y="291" text-anchor="middle" font-family="JetBrains Mono" font-size="9.5" fill="#f59e0b">Cert installé : CN=vip.zres</text>
+          <text x="500" y="305" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">(EKU Remote Desktop Auth)</text>
+          <text x="500" y="324" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#f59e0b">FQDN: vip.zres.lan</text>
+          <text x="500" y="340" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">IP: 10.zres.x.x</text>
+        </g>
+
+        <g id="topo-target">
+          <rect x="730" y="160" width="220" height="160" rx="10" fill="#0d1828" stroke="#00d4ff" stroke-width="2" filter="url(#glow)"/>
+          <rect x="730" y="160" width="220" height="32" rx="10" fill="rgba(0,212,255,0.15)"/>
+          <text x="840" y="181" text-anchor="middle" font-family="JetBrains Mono" font-size="11" font-weight="700" fill="#00d4ff">CIBLE</text>
+          <rect x="815" y="200" width="50" height="32" rx="3" fill="none" stroke="#8da9cc" stroke-width="1.5"/>
+          <rect x="823" y="234" width="34" height="3" fill="#8da9cc"/>
+          <text x="840" y="222" text-anchor="middle" font-family="JetBrains Mono" font-size="14" fill="#00d4ff">🖥</text>
+          <text x="840" y="258" text-anchor="middle" font-family="Sora" font-size="12" font-weight="700" fill="#e8f0fe">Windows 11 23H2</text>
+          <text x="840" y="273" text-anchor="middle" font-family="JetBrains Mono" font-size="9.5" fill="#8da9cc">RDP Service termsrv.dll</text>
+          <text x="840" y="287" text-anchor="middle" font-family="JetBrains Mono" font-size="9.5" fill="#8da9cc">SPN: TERMSRV/host.zcam</text>
+          <text x="840" y="306" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#00d4ff">DOMAIN: ZCAM</text>
+        </g>
+
+        <g id="topo-flow-normal">
+          <line x1="270" y1="240" x2="380" y2="240" stroke="#3b82f6" stroke-width="2" marker-end="url(#t-arr)"/>
+          <text x="325" y="232" text-anchor="middle" font-family="JetBrains Mono" font-size="9.5" fill="#3b82f6">TCP 3389</text>
+          <text x="325" y="254" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#8da9cc">RDP (HYBRID_EX)</text>
+          <line x1="620" y1="240" x2="730" y2="240" stroke="#3b82f6" stroke-width="2" marker-end="url(#t-arr)"/>
+          <text x="675" y="232" text-anchor="middle" font-family="JetBrains Mono" font-size="9.5" fill="#3b82f6">TCP 3389</text>
+          <text x="675" y="254" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#8da9cc">forwarded (no decrypt)</text>
+        </g>
+
+        <g id="topo-fail" style="display:none">
+          <circle cx="675" cy="240" r="14" fill="rgba(239,68,68,0.2)" stroke="#ef4444" stroke-width="2" class="fail-marker"/>
+          <text x="675" y="245" text-anchor="middle" font-family="JetBrains Mono" font-size="12" font-weight="700" fill="#ef4444">✕</text>
+          <text x="675" y="282" text-anchor="middle" font-family="JetBrains Mono" font-size="9" font-weight="700" fill="#ef4444">RUPTURE</text>
+          <text x="675" y="295" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#ef4444">Aucun trafic vu</text>
+        </g>
+
+        <g id="topo-dns">
+          <rect x="120" y="370" width="180" height="70" rx="8" fill="#0d1420" stroke="#8b5cf6" stroke-width="1.5"/>
+          <text x="210" y="388" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#8b5cf6">DNS Resolution</text>
+          <text x="210" y="406" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">vip.zres.lan</text>
+          <text x="210" y="420" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">→ 10.x.x.x (zone zres)</text>
+          <text x="210" y="434" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#4a6280">Forwarder zcam→zres requis</text>
+        </g>
+
+        <g id="topo-kdc">
+          <rect x="370" y="370" width="260" height="80" rx="8" fill="#0d1420" stroke="#ec4899" stroke-width="1.5"/>
+          <text x="500" y="388" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#ec4899">★ NÉGOCIATION KERBEROS</text>
+          <text x="500" y="405" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">Client demande TGS pour:</text>
+          <text x="500" y="419" text-anchor="middle" font-family="JetBrains Mono" font-size="9.5" font-weight="700" fill="#f59e0b">TERMSRV/vip.zres.lan</text>
+          <text x="500" y="434" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#ef4444">⚠ SPN inexistant en zcam</text>
+          <text x="500" y="446" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#4a6280">→ Referral cross-realm requis</text>
+        </g>
+
+        <g id="topo-trace">
+          <rect x="700" y="370" width="240" height="70" rx="8" fill="#0d1420" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="820" y="388" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#ef4444">⚠ TRACE RÉSEAU</text>
+          <text x="820" y="406" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">Aucun paquet vu entre</text>
+          <text x="820" y="420" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">VIP F5 et la cible 23H2</text>
+          <text x="820" y="435" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#ef4444">→ Échec côté client/F5</text>
+        </g>
+
+        <rect x="20" y="480" width="960" height="46" rx="6" fill="rgba(0,0,0,0.4)" stroke="#1e2d45"/>
+        <text x="40" y="500" font-family="JetBrains Mono" font-size="9" font-weight="700" fill="#00d4ff">SYMPTÔMES OBSERVÉS :</text>
+        <text x="40" y="514" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">• Erreur de connexion sans mention de certificat</text>
+        <text x="320" y="514" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">• Trace réseau vide entre VIP et cible</text>
+        <text x="580" y="514" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">• Cert zcam sur cible : échoue aussi</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="alert alert-warning">
+    <span class="alert-icon">🎯</span>
+    <div class="alert-body">
+      <strong>Particularité critique de cette architecture</strong>
+      Le client est en <strong>25H2 (post-durcissement avril 2026 / KB5083769)</strong> tandis que la cible est en <strong>23H2</strong>. Cette asymétrie de versions, combinée à l'intercalation d'une VIP F5 dans un domaine tiers (zres) sans trust documenté, génère une cascade de problèmes potentiels touchant la résolution DNS, l'enregistrement SPN, la négociation Kerberos cross-realm, le fallback NTLM (potentiellement bloqué), et la validation du certificat serveur RDP.
+    </div>
+  </div>
+
+  <div class="cards-grid">
+    <div class="card info">
+      <div class="card-icon">🖥️</div>
+      <div class="card-title">Source — Win11 25H2 (zcam)</div>
+      <div class="card-desc">Client durci. CredSSP Protected Mode actif. NLA enforced. TLS 1.2+ obligatoire. Bloque les clients NTLMv1 et les anciens CredSSP. Demande un cert RDP avec EKU "Server Authentication" + "Remote Desktop Authentication".</div>
+    </div>
+    <div class="card warning">
+      <div class="card-icon">⚖️</div>
+      <div class="card-title">Intermédiaire — VIP F5 (zres)</div>
+      <div class="card-desc">TCP Bridge mode = le F5 fait du forwarding L4 sans inspection TLS. Le certificat installé n'est utile que si un Client SSL profile est attaché à la VIP. Sinon : décoration sans effet sur le flux RDP.</div>
+    </div>
+    <div class="card info">
+      <div class="card-icon">🎯</div>
+      <div class="card-title">Cible — Win11 23H2 (zcam)</div>
+      <div class="card-desc">Pré-durcissement. Accepte CredSSP v3, TLS 1.0+. SPN par défaut : TERMSRV/&lt;hostname&gt;.zcam.local. Présente son propre certificat RDP auto-signé sauf si un cert custom est déployé.</div>
+    </div>
+    <div class="card danger">
+      <div class="card-icon">⚠️</div>
+      <div class="card-title">Symptôme clé</div>
+      <div class="card-desc">Aucun trafic entre VIP et cible dans la trace. Cela signifie que la <strong>négociation casse côté client-F5</strong> avant que le F5 ne forward au backend. C'est cohérent avec un échec NLA/CredSSP au niveau application, pas avec un problème réseau pur.</div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="rdp-23h2">
+  <div class="section-header">
+    <div class="section-num">02</div>
+    <div class="section-title">Fonctionnement du protocole RDP en 23H2 (cible)</div>
+  </div>
+  <p class="section-desc">Le protocole RDP en version 23H2 correspond à la version pré-durcissement d'avril 2026. CredSSP v3-v5 supporté, TLS 1.0+ toléré, NLA optionnel et NTLM autorisé en fallback. Cette section détaille le handshake complet tel qu'implémenté côté cible.</p>
+
+  <div class="sub-title">Stack protocolaire RDP en 23H2</div>
+
+  <div class="diagram-wrapper">
+    <div class="diagram-toolbar">
+      <span class="diagram-toolbar-label">COUCHES :</span>
+      <button class="layer-btn lb-net on" onclick="toggleLayerGen('23h2','net',this)">Transport</button>
+      <button class="layer-btn lb-tls on" onclick="toggleLayerGen('23h2','tls',this)">TLS</button>
+      <button class="layer-btn lb-cred on" onclick="toggleLayerGen('23h2','cred',this)">CredSSP/NLA</button>
+      <button class="layer-btn lb-rdp on" onclick="toggleLayerGen('23h2','rdp',this)">RDP Core</button>
+      <button class="anim-btn" onclick="animateHandshake('23h2')">▶ Animer le handshake</button>
+    </div>
+    <div class="diagram-svg-area">
+      <svg id="svg-23h2" viewBox="0 0 940 720" xmlns="http://www.w3.org/2000/svg" style="min-width:760px">
+        <defs>
+          <marker id="ar23" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#3b82f6"/></marker>
+          <marker id="ar23-r" markerWidth="8" markerHeight="6" refX="0" refY="3" orient="auto"><polygon points="8 0, 0 3, 8 6" fill="#8b5cf6"/></marker>
+          <marker id="ar23-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#10b981"/></marker>
+          <marker id="ar23-o" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f59e0b"/></marker>
+        </defs>
+
+        <rect x="20" y="20" width="220" height="40" rx="10" fill="rgba(0,212,255,0.1)" stroke="#1e2d45"/>
+        <text x="130" y="45" text-anchor="middle" font-family="JetBrains Mono" font-size="11" font-weight="700" fill="#00d4ff">CLIENT RDP (mstsc)</text>
+        <rect x="700" y="20" width="220" height="40" rx="10" fill="rgba(0,212,255,0.1)" stroke="#1e2d45"/>
+        <text x="810" y="45" text-anchor="middle" font-family="JetBrains Mono" font-size="11" font-weight="700" fill="#00d4ff">SERVEUR 23H2 (termsrv)</text>
+        <line x1="130" y1="60" x2="130" y2="680" stroke="#1e2d45" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="810" y1="60" x2="810" y2="680" stroke="#1e2d45" stroke-width="1" stroke-dasharray="3,3"/>
+
+        <g id="ph-23h2-net">
+          <rect x="280" y="78" width="380" height="24" rx="4" fill="rgba(59,130,246,0.08)" stroke="rgba(59,130,246,0.3)"/>
+          <text x="470" y="94" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#3b82f6">① PHASE TRANSPORT — TCP 3389</text>
+          <line x1="135" y1="115" x2="805" y2="115" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#ar23)" stroke-dasharray="6,3"/>
+          <text x="470" y="111" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#3b82f6">TCP SYN → 3389</text>
+          <line x1="805" y1="135" x2="135" y2="135" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#ar23-r)" stroke-dasharray="6,3"/>
+          <text x="470" y="131" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#3b82f6">TCP SYN-ACK / ACK</text>
+        </g>
+
+        <g id="ph-23h2-rdp">
+          <rect x="280" y="158" width="380" height="24" rx="4" fill="rgba(245,158,11,0.08)" stroke="rgba(245,158,11,0.3)"/>
+          <text x="470" y="174" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#f59e0b">② X.224 CONNECTION REQUEST</text>
+          <line x1="135" y1="198" x2="805" y2="198" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#ar23-o)"/>
+          <text x="470" y="193" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#f59e0b">RDP Negotiation Request → flags: PROTOCOL_HYBRID | SSL</text>
+          <text x="470" y="210" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#8da9cc">"cookie: mstshash=user@zcam.local" (routing hint)</text>
+          <line x1="805" y1="228" x2="135" y2="228" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#ar23-r)" stroke-dasharray="4,2"/>
+          <text x="470" y="224" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#f59e0b">RDP Negotiation Response → selected: PROTOCOL_HYBRID (CredSSP)</text>
+        </g>
+
+        <g id="ph-23h2-tls">
+          <rect x="280" y="248" width="380" height="24" rx="4" fill="rgba(139,92,246,0.08)" stroke="rgba(139,92,246,0.3)"/>
+          <text x="470" y="264" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#8b5cf6">③ TLS HANDSHAKE (1.0 / 1.1 / 1.2 — toléré)</text>
+          <line x1="135" y1="288" x2="805" y2="288" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#ar23-r)"/>
+          <text x="470" y="284" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8b5cf6">ClientHello (TLS 1.0+) + extensions SNI</text>
+          <line x1="805" y1="306" x2="135" y2="306" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#ar23-r)" stroke-dasharray="5,3"/>
+          <text x="470" y="302" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8b5cf6">ServerHello + Certificate (self-signed RDP-Tcp ou GPO cert)</text>
+          <text x="470" y="324" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" font-weight="700" fill="#ef4444">⚠ Le client valide le CN du cert vs nom de connexion (ex: vip.zres.lan)</text>
+        </g>
+
+        <g id="ph-23h2-cred">
+          <rect x="280" y="348" width="380" height="24" rx="4" fill="rgba(239,68,68,0.08)" stroke="rgba(239,68,68,0.3)"/>
+          <text x="470" y="364" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#ef4444">④ CredSSP / NLA — SPNEGO (Kerberos puis NTLM)</text>
+          <line x1="135" y1="388" x2="805" y2="388" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar23-r)"/>
+          <text x="470" y="384" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#ef4444">SPNEGO Init → Negotiate (Kerberos preferred)</text>
+          <rect x="270" y="402" width="400" height="80" rx="5" fill="rgba(236,72,153,0.05)" stroke="rgba(236,72,153,0.25)" stroke-dasharray="3,3"/>
+          <text x="470" y="416" text-anchor="middle" font-family="JetBrains Mono" font-size="9" font-weight="700" fill="#ec4899">↪ Sous-séquence Kerberos (TGS-REQ vers KDC zcam)</text>
+          <text x="470" y="432" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#8da9cc">1. Lookup SPN = TERMSRV/&lt;hostname-cible&gt;.zcam.local</text>
+          <text x="470" y="446" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#8da9cc">2. KDC répond avec service ticket chiffré pour le compte machine cible</text>
+          <text x="470" y="460" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#8da9cc">3. AP-REQ envoyé au serveur dans la phase NLA</text>
+          <text x="470" y="474" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" font-weight="700" fill="#f59e0b">→ Si SPN absent : fallback NTLM autorisé en 23H2</text>
+          <line x1="805" y1="498" x2="135" y2="498" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar23-r)" stroke-dasharray="4,2"/>
+          <text x="470" y="494" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#ef4444">SPNEGO Response → Auth complete (AP-REP)</text>
+          <line x1="135" y1="516" x2="805" y2="516" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar23-r)"/>
+          <text x="470" y="512" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#ef4444">TSCredentials (mot de passe chiffré via session key) →</text>
+          <line x1="805" y1="534" x2="135" y2="534" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar23-r)" stroke-dasharray="4,2"/>
+          <text x="470" y="530" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#ef4444">Public Key Auth (server cert) — pubkey-auth blob</text>
+        </g>
+
+        <g id="ph-23h2-rdp2">
+          <rect x="280" y="556" width="380" height="24" rx="4" fill="rgba(16,185,129,0.08)" stroke="rgba(16,185,129,0.3)"/>
+          <text x="470" y="572" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#10b981">⑤ RDP SESSION SETUP</text>
+          <line x1="135" y1="596" x2="805" y2="596" stroke="#10b981" stroke-width="1.5" marker-end="url(#ar23-g)"/>
+          <text x="470" y="592" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#10b981">MCS Connect Initial + GCC Conference Create Req</text>
+          <line x1="805" y1="614" x2="135" y2="614" stroke="#10b981" stroke-width="1.5" marker-end="url(#ar23-r)" stroke-dasharray="4,2"/>
+          <text x="470" y="610" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#10b981">MCS Response + GCC Keys + Channel List</text>
+          <line x1="135" y1="632" x2="805" y2="632" stroke="#10b981" stroke-width="1.5" marker-end="url(#ar23-g)"/>
+          <text x="470" y="628" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#10b981">Erect Domain Request + Attach User Request</text>
+          <line x1="135" y1="650" x2="805" y2="650" stroke="#10b981" stroke-width="2" marker-end="url(#ar23-g)"/>
+          <text x="470" y="646" text-anchor="middle" font-family="JetBrains Mono" font-size="9" font-weight="700" fill="#10b981">✓ Session établie — Canaux ouverts (clip, drive, audio)</text>
+        </g>
+
+        <rect x="20" y="690" width="900" height="22" rx="4" fill="rgba(0,0,0,0.4)" stroke="#1e2d45"/>
+        <text x="40" y="704" font-family="JetBrains Mono" font-size="9" fill="#3b82f6">● Transport</text>
+        <text x="160" y="704" font-family="JetBrains Mono" font-size="9" fill="#f59e0b">● RDP Negotiation</text>
+        <text x="290" y="704" font-family="JetBrains Mono" font-size="9" fill="#8b5cf6">● TLS Handshake</text>
+        <text x="420" y="704" font-family="JetBrains Mono" font-size="9" fill="#ef4444">● CredSSP / NLA</text>
+        <text x="560" y="704" font-family="JetBrains Mono" font-size="9" fill="#10b981">● RDP Session</text>
+        <text x="800" y="704" font-family="JetBrains Mono" font-size="9" font-weight="700" fill="#10b981">Windows 11 23H2</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="sub-title">Caractéristiques du RDP 23H2</div>
+  <div class="cards-grid">
+    <div class="card info">
+      <div class="card-icon">🔓</div>
+      <div class="card-title">CredSSP plus permissif</div>
+      <div class="card-desc">EncryptionOracleRemediation par défaut = Mitigated (2). Accepte clients SHA-1. Compatible avec CredSSP v3 et antérieurs. Le fallback NTLM est possible.</div>
+    </div>
+    <div class="card info">
+      <div class="card-icon">🔐</div>
+      <div class="card-title">TLS 1.0 / 1.1 tolérés</div>
+      <div class="card-desc">Par défaut, le serveur accepte TLS 1.0, 1.1 et 1.2. Les algorithmes de chiffrement legacy sont activés. Negotiate cipher suite incluant 3DES possible.</div>
+    </div>
+    <div class="card info">
+      <div class="card-icon">🎫</div>
+      <div class="card-title">NTLMv2 en fallback</div>
+      <div class="card-desc">Si Kerberos échoue (SPN absent, KDC injoignable, cross-realm sans trust), le client tombe en NTLMv2 sans avertissement bloquant.</div>
+    </div>
+    <div class="card info">
+      <div class="card-icon">📜</div>
+      <div class="card-title">Certificat self-signed accepté</div>
+      <div class="card-desc">Le serveur génère un certificat self-signed à l'installation. L'utilisateur reçoit un avertissement mais peut cocher "Don't ask again" pour bypasser.</div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="rdp-25h2">
+  <div class="section-header">
+    <div class="section-num">03</div>
+    <div class="section-title">Fonctionnement du protocole RDP en 25H2 (source — client durci)</div>
+  </div>
+  <p class="section-desc">Le client 25H2 applique le durcissement KB5083769 (avril 2026). Plusieurs comportements changent radicalement : CredSSP Protected Mode (SHA-256 obligatoire), NLA strictement enforced, NTLM v1 bloqué, TLS 1.0/1.1 rejetés, et nouvelle validation stricte du certificat serveur RDP.</p>
+
+  <div class="diagram-wrapper">
+    <div class="diagram-toolbar">
+      <span class="diagram-toolbar-label">COUCHES :</span>
+      <button class="layer-btn lb-net on" onclick="toggleLayerGen('25h2','net',this)">Transport</button>
+      <button class="layer-btn lb-tls on" onclick="toggleLayerGen('25h2','tls',this)">TLS 1.2+</button>
+      <button class="layer-btn lb-cred on" onclick="toggleLayerGen('25h2','cred',this)">CredSSP Protected</button>
+      <button class="layer-btn lb-rdp on" onclick="toggleLayerGen('25h2','rdp',this)">RDP</button>
+      <button class="layer-btn lb-fail on" onclick="toggleLayerGen('25h2','fail',this)">★ Points de blocage</button>
+      <button class="anim-btn" onclick="animateHandshake('25h2')">▶ Animer</button>
+    </div>
+    <div class="diagram-svg-area">
+      <svg id="svg-25h2" viewBox="0 0 940 760" xmlns="http://www.w3.org/2000/svg" style="min-width:760px">
+        <defs>
+          <marker id="ar25" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#3b82f6"/></marker>
+          <marker id="ar25-r" markerWidth="8" markerHeight="6" refX="0" refY="3" orient="auto"><polygon points="8 0, 0 3, 8 6" fill="#8b5cf6"/></marker>
+          <marker id="ar25-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444"/></marker>
+          <marker id="ar25-cy" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#00d4ff"/></marker>
+        </defs>
+
+        <rect x="20" y="20" width="220" height="40" rx="10" fill="rgba(245,158,11,0.15)" stroke="#f59e0b"/>
+        <text x="130" y="45" text-anchor="middle" font-family="JetBrains Mono" font-size="11" font-weight="700" fill="#f59e0b">CLIENT 25H2 (durci)</text>
+        <rect x="700" y="20" width="220" height="40" rx="10" fill="rgba(0,212,255,0.1)" stroke="#1e2d45"/>
+        <text x="810" y="45" text-anchor="middle" font-family="JetBrains Mono" font-size="11" font-weight="700" fill="#00d4ff">SERVEUR 23H2 (cible)</text>
+        <line x1="130" y1="60" x2="130" y2="720" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.5"/>
+        <line x1="810" y1="60" x2="810" y2="720" stroke="#1e2d45" stroke-width="1" stroke-dasharray="3,3"/>
+
+        <g id="ph-25h2-net">
+          <rect x="280" y="78" width="380" height="24" rx="4" fill="rgba(59,130,246,0.08)" stroke="rgba(59,130,246,0.3)"/>
+          <text x="470" y="94" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#3b82f6">① TCP 3389 — via VIP F5 (TCP Bridge)</text>
+          <line x1="135" y1="115" x2="805" y2="115" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#ar25)" stroke-dasharray="6,3"/>
+          <text x="470" y="111" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#3b82f6">TCP SYN (dest: vip.zres.lan:3389)</text>
+        </g>
+
+        <g id="ph-25h2-rdp">
+          <rect x="280" y="138" width="380" height="24" rx="4" fill="rgba(245,158,11,0.08)" stroke="rgba(245,158,11,0.3)"/>
+          <text x="470" y="154" text-anchor="middle" font-family="JetBrains Mono" font-size="9.5" font-weight="700" fill="#f59e0b">② X.224 — Negotiate PROTOCOL_HYBRID_EX</text>
+          <line x1="135" y1="178" x2="805" y2="178" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#ar25-red)"/>
+          <text x="470" y="174" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#f59e0b">RDP Neg Req: flags = HYBRID_EX (0x08) requis</text>
+        </g>
+
+        <g id="ph-25h2-tls">
+          <rect x="280" y="198" width="380" height="24" rx="4" fill="rgba(139,92,246,0.08)" stroke="rgba(139,92,246,0.3)"/>
+          <text x="470" y="214" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#8b5cf6">③ TLS 1.2 / 1.3 — STRICT (TLS 1.0 / 1.1 rejetés)</text>
+          <line x1="135" y1="238" x2="805" y2="238" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#ar25-r)"/>
+          <text x="470" y="234" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8b5cf6">ClientHello (TLS 1.2 min, AES-GCM préféré)</text>
+          <line x1="805" y1="256" x2="135" y2="256" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#ar25-r)" stroke-dasharray="5,3"/>
+          <text x="470" y="252" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8b5cf6">ServerHello + Certificate (via F5 TCP bridge → cert de la cible)</text>
+        </g>
+
+        <g id="ph-25h2-fail-cert" class="ph-25h2-fail">
+          <rect x="260" y="278" width="420" height="36" rx="5" fill="rgba(239,68,68,0.12)" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="470" y="293" text-anchor="middle" font-family="JetBrains Mono" font-size="9.5" font-weight="700" fill="#ef4444">★ POINT DE BLOCAGE #1 — Validation du certificat</text>
+          <text x="470" y="307" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#ef4444">Cert présenté CN = nom cible (zcam) mais client attend CN = vip.zres.lan</text>
+        </g>
+
+        <g id="ph-25h2-cred">
+          <rect x="280" y="330" width="380" height="24" rx="4" fill="rgba(0,212,255,0.08)" stroke="rgba(0,212,255,0.4)"/>
+          <text x="470" y="346" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#00d4ff">④ CredSSP Protected Mode — NLA ENFORCED</text>
+          <line x1="135" y1="370" x2="805" y2="370" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#ar25-cy)"/>
+          <text x="470" y="366" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#00d4ff">SPNEGO Negotiate (Kerberos uniquement préféré)</text>
+          <rect x="240" y="384" width="460" height="100" rx="5" fill="rgba(236,72,153,0.06)" stroke="rgba(236,72,153,0.3)" stroke-dasharray="3,3"/>
+          <text x="470" y="400" text-anchor="middle" font-family="JetBrains Mono" font-size="9" font-weight="700" fill="#ec4899">↪ Kerberos TGS-REQ vers KDC zcam</text>
+          <text x="470" y="416" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#8da9cc">1. Le client cherche SPN <tspan font-weight="700" fill="#f59e0b">TERMSRV/vip.zres.lan</tspan></text>
+          <text x="470" y="430" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#ef4444">2. ⚠ SPN absent du domaine zcam (la VIP n'y est pas enregistrée)</text>
+          <text x="470" y="444" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#ef4444">3. ⚠ Sans trust zcam→zres : referral KO → KDC_ERR_S_PRINCIPAL_UNKNOWN</text>
+          <text x="470" y="458" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#ef4444">4. ⚠ Fallback NTLM tenté MAIS NTLMv1 bloqué + NTLMv2 cross-realm limité</text>
+          <text x="470" y="472" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" font-weight="700" fill="#ec4899">→ CredSSP échoue ICI, AVANT toute communication avec la cible</text>
+        </g>
+
+        <g id="ph-25h2-fail-spn" class="ph-25h2-fail">
+          <rect x="240" y="496" width="460" height="38" rx="5" fill="rgba(239,68,68,0.12)" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="470" y="512" text-anchor="middle" font-family="JetBrains Mono" font-size="9.5" font-weight="700" fill="#ef4444">★ POINT DE BLOCAGE #2 — SPN inexistant en zcam</text>
+          <text x="470" y="526" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#ef4444">Sans SPN ni trust ni NTLM, CredSSP échoue avant le forward F5 → cible</text>
+        </g>
+
+        <g id="ph-25h2-error">
+          <rect x="200" y="550" width="540" height="80" rx="6" fill="#1a0a0a" stroke="#ef4444" stroke-width="2"/>
+          <text x="470" y="572" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#ef4444">ERREUR AFFICHÉE CÔTÉ CLIENT</text>
+          <text x="470" y="591" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#fca5a5">"An authentication error has occurred."</text>
+          <text x="470" y="606" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#fca5a5">"The function requested is not supported."</text>
+          <text x="470" y="620" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">+ "This could be due to NTLM authentication being blocked" / CredSSP</text>
+        </g>
+
+        <g id="ph-25h2-notrace">
+          <rect x="280" y="648" width="380" height="60" rx="5" fill="rgba(239,68,68,0.06)" stroke="rgba(239,68,68,0.3)" stroke-dasharray="3,3"/>
+          <text x="470" y="666" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#ef4444">⑤ AUCUN PAQUET VERS LA CIBLE</text>
+          <text x="470" y="684" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">Le F5 forward TCP, mais le client coupe la session</text>
+          <text x="470" y="698" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">au niveau CredSSP avant tout MCS Connect.</text>
+        </g>
+
+        <rect x="20" y="720" width="900" height="22" rx="4" fill="rgba(0,0,0,0.4)" stroke="#1e2d45"/>
+        <text x="40" y="734" font-family="JetBrains Mono" font-size="9" fill="#3b82f6">● TCP</text>
+        <text x="110" y="734" font-family="JetBrains Mono" font-size="9" fill="#f59e0b">● RDP Neg</text>
+        <text x="200" y="734" font-family="JetBrains Mono" font-size="9" fill="#8b5cf6">● TLS 1.2+</text>
+        <text x="290" y="734" font-family="JetBrains Mono" font-size="9" fill="#00d4ff">● CredSSP Protected</text>
+        <text x="450" y="734" font-family="JetBrains Mono" font-size="9" font-weight="700" fill="#ef4444">★ Point de blocage</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="alert alert-danger">
+    <span class="alert-icon">🚨</span>
+    <div class="alert-body">
+      <strong>Différence clé 23H2 → 25H2 dans VOTRE scénario</strong>
+      En 23H2, si le SPN Kerberos est absent ou le trust manquant, le client tombait silencieusement en NTLM et la connexion réussissait. En 25H2, ce fallback est <strong>verrouillé par défaut</strong> : NTLMv1 bloqué, NTLMv2 cross-realm restreint, et CredSSP Protected Mode refuse de poursuivre. Résultat : la connexion casse côté client AVANT que le F5 ne forward au backend → cohérent avec votre trace réseau vide.
+    </div>
+  </div>
+</section>
+
+<section class="section" id="f5-arch">
+  <div class="section-header">
+    <div class="section-num">04</div>
+    <div class="section-title">Architecture F5 BIG-IP — Modes TCP Bridge, SSL Bridge, Passthrough</div>
+  </div>
+  <p class="section-desc">La compréhension fine du mode de fonctionnement F5 est essentielle. Le terme "TCP bridge" recouvre plusieurs réalités différentes. Cette section explique chaque mode et identifie pourquoi le certificat installé sur la VIP n'apparaît dans aucun message d'erreur.</p>
+
+  <div class="diagram-wrapper">
+    <div class="diagram-svg-area">
+      <svg viewBox="0 0 980 540" xmlns="http://www.w3.org/2000/svg" style="min-width:760px">
+        <defs>
+          <marker id="f5-ar" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#3b82f6"/></marker>
+          <marker id="f5-ar-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#10b981"/></marker>
+          <marker id="f5-ar-o" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f59e0b"/></marker>
+        </defs>
+
+        <g>
+          <rect x="20" y="20" width="940" height="160" rx="10" fill="rgba(16,185,129,0.05)" stroke="rgba(16,185,129,0.4)" stroke-width="1.5"/>
+          <text x="40" y="42" font-family="JetBrains Mono" font-size="12" font-weight="700" fill="#10b981">MODE A — TCP BRIDGE / FORWARDING L4 (votre configuration actuelle probable)</text>
+          <text x="40" y="58" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">F5 ne touche pas au payload. TLS passe end-to-end. Le cert sur F5 n'est utilisé QUE si un Client SSL profile est attaché à la VIP.</text>
+          <rect x="50" y="80" width="140" height="60" rx="6" fill="#0d1828" stroke="#00d4ff" stroke-width="1.5"/>
+          <text x="120" y="100" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#00d4ff">CLIENT 25H2</text>
+          <text x="120" y="115" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">Initie TLS handshake</text>
+          <text x="120" y="128" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">→ vip.zres.lan:3389</text>
+          <rect x="420" y="80" width="140" height="60" rx="6" fill="#1a1207" stroke="#f59e0b" stroke-width="1.5"/>
+          <text x="490" y="100" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#f59e0b">F5 VIP (TCP only)</text>
+          <text x="490" y="115" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">Forward L4 transparent</text>
+          <text x="490" y="128" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#10b981">Cert: NON UTILISÉ</text>
+          <rect x="780" y="80" width="140" height="60" rx="6" fill="#0d1828" stroke="#00d4ff" stroke-width="1.5"/>
+          <text x="850" y="100" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#00d4ff">CIBLE 23H2</text>
+          <text x="850" y="115" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">Termine TLS handshake</text>
+          <text x="850" y="128" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">Présente SON cert</text>
+          <line x1="195" y1="110" x2="415" y2="110" stroke="#10b981" stroke-width="2" marker-end="url(#f5-ar-g)" stroke-dasharray="2,2"/>
+          <text x="305" y="105" text-anchor="middle" font-family="JetBrains Mono" font-size="9" font-weight="700" fill="#10b981">TLS chiffré — end-to-end</text>
+          <line x1="565" y1="110" x2="775" y2="110" stroke="#10b981" stroke-width="2" marker-end="url(#f5-ar-g)" stroke-dasharray="2,2"/>
+          <text x="670" y="105" text-anchor="middle" font-family="JetBrains Mono" font-size="9" font-weight="700" fill="#10b981">TLS chiffré (même tunnel)</text>
+          <text x="490" y="160" text-anchor="middle" font-family="JetBrains Mono" font-size="9" font-weight="700" fill="#10b981">→ Le client voit le cert de la CIBLE (CN=hostname.zcam), pas le cert F5</text>
+        </g>
+
+        <g>
+          <rect x="20" y="200" width="940" height="160" rx="10" fill="rgba(245,158,11,0.05)" stroke="rgba(245,158,11,0.4)" stroke-width="1.5"/>
+          <text x="40" y="222" font-family="JetBrains Mono" font-size="12" font-weight="700" fill="#f59e0b">MODE B — SSL BRIDGE (TLS terminé sur F5 + re-chiffré vers backend)</text>
+          <text x="40" y="238" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">Le F5 termine TLS, déchiffre, ré-établit un TLS vers la cible. Requiert Client SSL + Server SSL profiles. Cert F5 visible côté client.</text>
+          <rect x="50" y="260" width="140" height="60" rx="6" fill="#0d1828" stroke="#00d4ff" stroke-width="1.5"/>
+          <text x="120" y="280" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#00d4ff">CLIENT 25H2</text>
+          <text x="120" y="295" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">TLS handshake vers F5</text>
+          <rect x="420" y="260" width="140" height="60" rx="6" fill="#1a1207" stroke="#f59e0b" stroke-width="2"/>
+          <text x="490" y="280" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#f59e0b">F5 VIP (SSL Bridge)</text>
+          <text x="490" y="295" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">Termine TLS client</text>
+          <text x="490" y="308" text-anchor="middle" font-family="JetBrains Mono" font-size="9" font-weight="700" fill="#f59e0b">Cert F5 PRÉSENTÉ</text>
+          <rect x="780" y="260" width="140" height="60" rx="6" fill="#0d1828" stroke="#00d4ff" stroke-width="1.5"/>
+          <text x="850" y="280" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#00d4ff">CIBLE 23H2</text>
+          <text x="850" y="295" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">TLS handshake vers F5</text>
+          <text x="850" y="308" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">(nouveau tunnel)</text>
+          <line x1="195" y1="290" x2="415" y2="290" stroke="#f59e0b" stroke-width="2" marker-end="url(#f5-ar-o)" stroke-dasharray="2,2"/>
+          <text x="305" y="285" text-anchor="middle" font-family="JetBrains Mono" font-size="9" font-weight="700" fill="#f59e0b">TLS #1 (cert F5)</text>
+          <line x1="565" y1="290" x2="775" y2="290" stroke="#f59e0b" stroke-width="2" marker-end="url(#f5-ar-o)" stroke-dasharray="2,2"/>
+          <text x="670" y="285" text-anchor="middle" font-family="JetBrains Mono" font-size="9" font-weight="700" fill="#f59e0b">TLS #2 (cert cible)</text>
+          <text x="490" y="345" text-anchor="middle" font-family="JetBrains Mono" font-size="9" font-weight="700" fill="#f59e0b">⚠ CredSSP/NLA NE FONCTIONNE PAS en SSL bridge classique — RDP nécessite tunnel TLS unique</text>
+        </g>
+
+        <g>
+          <rect x="20" y="380" width="940" height="140" rx="10" fill="rgba(59,130,246,0.05)" stroke="rgba(59,130,246,0.4)" stroke-width="1.5"/>
+          <text x="40" y="402" font-family="JetBrains Mono" font-size="12" font-weight="700" fill="#3b82f6">MODE C — SSL PASSTHROUGH (= TCP forwarding sans inspection SSL)</text>
+          <text x="40" y="418" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">Équivalent fonctionnel du Mode A. Aucun profile SSL côté client. Le F5 ne voit que du TCP chiffré opaque.</text>
+          <rect x="50" y="438" width="140" height="60" rx="6" fill="#0d1828" stroke="#00d4ff" stroke-width="1.5"/>
+          <text x="120" y="468" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#00d4ff">CLIENT</text>
+          <rect x="420" y="438" width="140" height="60" rx="6" fill="#1a1207" stroke="#f59e0b" stroke-width="1.5"/>
+          <text x="490" y="468" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#f59e0b">F5 (Passthrough)</text>
+          <text x="490" y="481" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#3b82f6">TCP profile uniquement</text>
+          <rect x="780" y="438" width="140" height="60" rx="6" fill="#0d1828" stroke="#00d4ff" stroke-width="1.5"/>
+          <text x="850" y="468" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#00d4ff">CIBLE</text>
+          <line x1="195" y1="468" x2="415" y2="468" stroke="#3b82f6" stroke-width="2" marker-end="url(#f5-ar)" stroke-dasharray="2,2"/>
+          <line x1="565" y1="468" x2="775" y2="468" stroke="#3b82f6" stroke-width="2" marker-end="url(#f5-ar)" stroke-dasharray="2,2"/>
+          <text x="305" y="463" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#3b82f6">TCP opaque</text>
+          <text x="670" y="463" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#3b82f6">TCP opaque</text>
+        </g>
+      </svg>
+    </div>
+  </div>
+
+  <div class="alert alert-info">
+    <span class="alert-icon">💡</span>
+    <div class="alert-body">
+      <strong>Pourquoi votre cert F5 n'apparaît dans aucun message d'erreur</strong>
+      Dans un montage TCP bridge / SSL passthrough (votre cas le plus probable), le F5 ne fait que du forwarding L4. Le certificat que vous avez installé sur la VIP n'est <strong>jamais présenté</strong> au client RDP, car aucun Client SSL profile ne le référence. Le handshake TLS se fait end-to-end entre le client 25H2 et la cible 23H2 : c'est le certificat de la <strong>cible</strong> qui est validé. D'où l'absence de mention du cert F5 dans le message d'erreur — il est invisible pour le client.
+    </div>
+  </div>
+
+  <div class="sub-title">Quel cert valide réellement le client 25H2 ?</div>
+  <table class="compare-table">
+    <thead>
+      <tr><th>Mode F5</th><th>Cert présenté</th><th>CN attendu par le client</th><th>Cas d'échec</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>TCP Bridge / Passthrough</td>
+        <td>Cert de la <strong>cible 23H2</strong></td>
+        <td>vip.zres.lan (nom de connexion)</td>
+        <td>Cert cible a CN=host.zcam ≠ vip.zres.lan → avertissement OU rejet</td>
+      </tr>
+      <tr>
+        <td>SSL Bridge (terminate)</td>
+        <td>Cert du <strong>F5</strong></td>
+        <td>vip.zres.lan</td>
+        <td>RDP ne supporte pas la rupture TLS en milieu de chaîne → CredSSP échoue</td>
+      </tr>
+      <tr>
+        <td>SSL Bridge + Proxy SSL</td>
+        <td>Cert du <strong>F5</strong> visible, key de la cible utilisée</td>
+        <td>vip.zres.lan ou host.zcam</td>
+        <td>F5 doit avoir la clé privée du serveur cible — rarement le cas</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="section" id="analyse">
+  <div class="section-header">
+    <div class="section-num">05</div>
+    <div class="section-title">Analyse approfondie — Causes racines possibles</div>
+  </div>
+  <p class="section-desc">Synthèse des trois symptômes observés et identification des causes les plus probables, classées par ordre de probabilité décroissante.</p>
+
+  <div class="sub-title">Cause #1 — Échec Kerberos cross-realm (probabilité TRÈS ÉLEVÉE)</div>
+  <div class="alert alert-danger">
+    <span class="alert-icon">🎯</span>
+    <div class="alert-body">
+      <strong>Diagnostic principal</strong>
+      Le client 25H2 résout <code style="font-family:'JetBrains Mono',monospace;background:rgba(0,0,0,0.4);padding:1px 5px;border-radius:3px;color:var(--accent-cyan)">vip.zres.lan</code> et tente d'obtenir un service ticket Kerberos pour le SPN <code style="font-family:'JetBrains Mono',monospace;background:rgba(0,0,0,0.4);padding:1px 5px;border-radius:3px;color:var(--accent-orange)">TERMSRV/vip.zres.lan</code>. Ce SPN n'existe ni dans zcam (client) ni dans zres (VIP n'est pas un objet AD). Sans trust déclaré entre les forêts, aucun referral n'est possible. Le client échoue avec <code style="font-family:'JetBrains Mono',monospace;background:rgba(0,0,0,0.4);padding:1px 5px;border-radius:3px;color:var(--accent-red)">KDC_ERR_S_PRINCIPAL_UNKNOWN</code>. Le fallback NTLM est désormais restreint sur 25H2 → CredSSP échoue avant tout MCS Connect → aucun trafic ne part vers la cible.
+    </div>
+  </div>
+
+  <div class="sub-title">Cause #2 — F5 health monitor en échec (probabilité MOYENNE)</div>
+  <p style="font-size:13px;color:var(--text-secondary);line-height:1.65;margin-bottom:14px">Si le monitor F5 ne valide pas correctement la cible (par exemple un monitor HTTP au lieu de TCP-3389), le pool member peut être marqué <strong>DOWN</strong>. Dans ce cas, la VIP rejette les nouvelles connexions sans forwarder → trace réseau vide entre VIP et cible.</p>
+
+  <div class="sub-title">Cause #3 — Cert F5 attaché à un Client SSL profile mal configuré (probabilité MOYENNE)</div>
+  <p style="font-size:13px;color:var(--text-secondary);line-height:1.65;margin-bottom:14px">Si quelqu'un a ajouté un Client SSL profile à la VIP en pensant que c'était nécessaire pour le cert, le F5 essaye de terminer TLS. Or le client RDP attend une chaîne CredSSP continue. Le handshake TLS peut réussir, mais CredSSP échoue car la session TLS ne contient pas la bonne identité serveur. Résultat : connexion coupée côté F5.</p>
+
+  <div class="sub-title">Cause #4 — Pas de relation d'approbation entre zcam et zres (probabilité ÉLEVÉE — à vérifier)</div>
+  <p style="font-size:13px;color:var(--text-secondary);line-height:1.65;margin-bottom:14px">Question explicite. Sans trust :</p>
+  <ul style="font-size:13px;color:var(--text-secondary);line-height:1.8;padding-left:24px;margin-bottom:18px">
+    <li>Les DC zcam ne peuvent pas demander un referral vers les DC zres pour résoudre un SPN.</li>
+    <li>Le client peut résoudre le DNS de vip.zres.lan (via forwarder), mais ne peut pas authentifier auprès du domaine zres.</li>
+    <li>Toutefois, comme la VIP n'est PAS le serveur final, ce point a moins d'impact qu'il n'en a l'air — si on règle le SPN dans zcam (sur le compte machine de la cible), le trust devient inutile.</li>
+  </ul>
+
+  <div class="sub-title">Cause #5 — Cert sur cible avec mauvais Subject Alternative Name (SAN)</div>
+  <p style="font-size:13px;color:var(--text-secondary);line-height:1.65;margin-bottom:14px">Vous avez aussi tenté d'installer un cert zcam avec EKU "Remote Desktop Authentication" sur la cible. Si le cert n'inclut PAS <code style="font-family:'JetBrains Mono',monospace;background:rgba(0,0,0,0.4);padding:1px 5px;border-radius:3px;color:var(--accent-cyan)">vip.zres.lan</code> dans son SAN, le client 25H2 (qui se connecte par le nom de la VIP) rejette le cert. Le cert doit lister TOUS les noms par lesquels les clients peuvent se connecter.</p>
+
+  <div class="cards-grid">
+    <div class="card danger">
+      <div class="card-icon">📡</div>
+      <div class="card-title">Trace réseau vide entre VIP et cible</div>
+      <div class="card-desc"><strong>Interprétation :</strong> l'échec se produit côté client OU dans la phase F5 amont. Si le client coupe la connexion en CredSSP, le F5 referme la connexion backend (ou ne l'ouvre jamais).</div>
+    </div>
+    <div class="card danger">
+      <div class="card-icon">🪪</div>
+      <div class="card-title">Cert F5 invisible dans l'erreur</div>
+      <div class="card-desc"><strong>Interprétation :</strong> en TCP bridge, le cert F5 n'est jamais présenté. L'erreur survient avant/pendant CredSSP. Le client ne sait pas qu'un cert existe sur le F5.</div>
+    </div>
+    <div class="card danger">
+      <div class="card-icon">🎫</div>
+      <div class="card-title">Cert zcam sur cible : échec aussi</div>
+      <div class="card-desc"><strong>Interprétation :</strong> le cert seul ne résout rien si Kerberos/NLA échoue en amont. Le cert n'est validé qu'APRÈS CredSSP réussi. Le problème est en amont.</div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="diagnostic">
+  <div class="section-header">
+    <div class="section-num">06</div>
+    <div class="section-title">Diagnostic étape par étape — 11 vérifications ordonnées</div>
+  </div>
+  <p class="section-desc">Suivez ces vérifications dans l'ordre. Chaque étape vise à isoler la source du problème sans introduire d'effets de bord. Notez les résultats à chaque étape.</p>
+
+  <ol class="step-list">
+    <li><strong>Vérifier la résolution DNS de la VIP depuis le client</strong><br/>
+      Sur le poste 25H2 : <code>nslookup vip.zres.lan</code> puis <code>Resolve-DnsName vip.zres.lan -Type A</code>. La réponse doit donner l'IP de la VIP F5. Si NXDOMAIN, configurer un forwarder DNS conditionnel zcam → zres ou un stub zone.
+    </li>
+    <li><strong>Tester la connectivité TCP brute vers la VIP</strong><br/>
+      <code>Test-NetConnection -ComputerName vip.zres.lan -Port 3389</code>. Doit retourner <code>TcpTestSucceeded : True</code>. Si False, c'est un problème réseau/firewall avant le F5.
+    </li>
+    <li><strong>Vérifier le statut du pool member F5</strong><br/>
+      Sur la console F5 : <code>tmsh show ltm pool &lt;pool_name&gt; members</code>. Le membre doit être <code>Available (Enabled)</code>. Si <code>OFFLINE</code> : revoir le monitor (privilégier <code>tcp_half_open</code> sur 3389 ou un monitor RDP custom).
+    </li>
+    <li><strong>Capturer le trafic côté F5 (deux interfaces)</strong><br/>
+      <code>tcpdump -nni 0.0:nnp host &lt;client_ip&gt; -w /shared/tmp/client-side.pcap</code> et idem pour <code>&lt;target_ip&gt;</code>. Comparer : si client-side voit du TLS mais server-side ne voit rien, le F5 ne forwarde pas (pool down OU client coupe trop tôt).
+    </li>
+    <li><strong>Vérifier la configuration du Virtual Server F5</strong><br/>
+      <code>tmsh list ltm virtual &lt;vs_name&gt; profiles</code>. Pour TCP bridge : doit lister <code>tcp</code> uniquement. La présence d'un <code>clientssl</code> profile indique que TLS est terminé sur le F5 → à supprimer pour rétablir le mode bridge.
+    </li>
+    <li><strong>Inspecter les SPN enregistrés pour la cible</strong><br/>
+      Sur un DC zcam : <code>setspn -L &lt;hostname-cible&gt;</code>. Doit lister au minimum <code>TERMSRV/&lt;hostname&gt;</code> et <code>TERMSRV/&lt;FQDN&gt;.zcam.local</code>. <strong>Le SPN TERMSRV/vip.zres.lan est probablement absent</strong> — c'est très souvent la cause racine.
+    </li>
+    <li><strong>Vérifier la présence d'un trust entre zcam et zres</strong><br/>
+      Sur un DC zcam : <code>nltest /domain_trusts</code> ou <code>Get-ADTrust -Filter *</code>. Si aucun trust avec zres : le referral cross-realm Kerberos est impossible. Toutefois, un SPN local sur le compte machine cible peut contourner ce point.
+    </li>
+    <li><strong>Lancer une trace Kerberos côté client</strong><br/>
+      <code>klist purge</code> puis tenter la connexion RDP, puis <code>klist</code>. Si aucun ticket pour <code>termsrv/vip.zres.lan</code> n'apparaît, Kerberos a échoué. Activer le logging Kerberos : <code>HKLM\...\Lsa\Kerberos\Parameters\LogLevel = 1</code> et consulter Event Viewer (System).
+    </li>
+    <li><strong>Examiner les Event Logs côté client 25H2</strong><br/>
+      <code>TerminalServices-ClientActiveXCore/Admin</code> et <code>System</code>. Chercher : Event ID 1024/1026 (RDP), 36874 (SChannel TLS), 4625 (auth). Le code 0x80004005 + "function requested is not supported" = signature CredSSP.
+    </li>
+    <li><strong>Examiner les Event Logs côté cible 23H2</strong><br/>
+      Si vide : confirme que la connexion ne l'atteint pas. Si présence d'Event ID 1149 : la connexion a touché la cible mais auth a échoué après → cause différente, à creuser via Event 4625.
+    </li>
+    <li><strong>Tester en bypass F5 (connexion directe à la cible)</strong><br/>
+      <code>mstsc /v:&lt;FQDN-cible&gt;.zcam.local</code>. Si ça marche en direct : le problème est lié à la VIP (SPN, cert, F5 config). Si ça échoue aussi : problème intrinsèque 25H2 ↔ 23H2 (durcissement CredSSP).
+    </li>
+  </ol>
+
+  <div class="alert alert-info">
+    <span class="alert-icon">📊</span>
+    <div class="alert-body">
+      <strong>Tableau d'interprétation des résultats</strong>
+      Si étape 2 ✓ mais 4 montre client-side TLS sans server-side → SPN ou F5 pool. Si étape 11 ✓ en direct mais ✗ via VIP → SPN/DNS spécifique à la VIP. Si étape 11 ✗ aussi → durcissement 25H2 incompatible avec cible 23H2 non patchée.
+    </div>
+  </div>
+</section>
+
+<section class="section" id="solutions">
+  <div class="section-header">
+    <div class="section-num">07</div>
+    <div class="section-title">Solutions complètes — 8 approches du plus simple au plus structurant</div>
+  </div>
+  <p class="section-desc">Solutions classées par priorité de mise en œuvre. Combinez plusieurs solutions selon vos contraintes. Chaque solution est testable indépendamment.</p>
+
+  <div class="solution-card primary">
+    <div class="sol-header">
+      <div class="sol-num">1</div>
+      <div class="sol-title">Enregistrer le SPN TERMSRV/vip.zres.lan sur le compte machine de la cible</div>
+      <span class="sol-difficulty sd-easy">FACILE · 5 min</span>
+      <span class="change-chip chip-green">RECOMMANDÉ #1</span>
+    </div>
+    <p class="sol-desc"><strong>C'est très probablement la solution principale.</strong> En ajoutant un SPN supplémentaire à la cible (compte machine dans zcam), Kerberos peut résoudre TERMSRV/vip.zres.lan vers la cible, même si la VIP n'est pas un objet AD. Pas besoin de trust avec zres.</p>
+    <div class="code-block"><span class="c"># Sur un DC zcam ou poste admin avec RSAT</span>
+<span class="k">setspn -S</span> <span class="v">TERMSRV/vip.zres.lan</span> <span class="w">HOSTNAME-CIBLE$</span>
+<span class="k">setspn -S</span> <span class="v">TERMSRV/vip</span> <span class="w">HOSTNAME-CIBLE$</span>  <span class="c"># Pour le nom court</span>
+
+<span class="c"># Vérifier l'enregistrement</span>
+<span class="k">setspn -L</span> <span class="w">HOSTNAME-CIBLE$</span>
+<span class="c"># Doit lister TERMSRV/vip.zres.lan + TERMSRV/hostname.zcam.local</span>
+
+<span class="c"># Côté client, purger les tickets Kerberos pour forcer un re-fetch</span>
+<span class="k">klist purge</span>
+<span class="k">klist purge -li 0x3e7</span>  <span class="c"># Inclut le contexte SYSTEM</span></div>
+    <div class="alert alert-warning" style="margin-top:8px">
+      <span class="alert-icon">⚠️</span>
+      <div class="alert-body">
+        <strong>Contrainte</strong>
+        Un SPN doit être unique dans la forêt. Si une autre machine a déjà <code>TERMSRV/vip.zres.lan</code>, setspn échoue. Vérifier avec <code>setspn -Q TERMSRV/vip.zres.lan</code>. Si conflit : nettoyer l'ancien avec <code>setspn -D</code>.
+      </div>
+    </div>
+  </div>
+
+  <div class="solution-card primary">
+    <div class="sol-header">
+      <div class="sol-num">2</div>
+      <div class="sol-title">Déployer un certificat sur la cible avec SAN incluant vip.zres.lan</div>
+      <span class="sol-difficulty sd-medium">MOYEN · 30 min</span>
+      <span class="change-chip chip-green">RECOMMANDÉ #2</span>
+    </div>
+    <p class="sol-desc">Le certificat sur la cible doit contenir <strong>tous les noms d'accès possibles</strong> en Subject Alternative Name : le hostname, le FQDN, ET le nom de la VIP (vip.zres.lan). Le cert doit avoir l'EKU "Server Authentication" (1.3.6.1.5.5.7.3.1) et idéalement "Remote Desktop Authentication" (1.3.6.1.4.1.311.54.1.2).</p>
+    <div class="code-block"><span class="c"># Sur l'AD CS de zcam : dupliquer le modèle "Computer" → "RDS-VIP-Cert"</span>
+<span class="c"># Extensions → Application Policies → ajouter "Remote Desktop Authentication"</span>
+
+<span class="c"># Demande explicite avec SAN multiple via certreq (sur la cible)</span>
+<span class="c"># Fichier request.inf :</span>
+<span class="v">[NewRequest]</span>
+<span class="v">Subject = "CN=hostname.zcam.local"</span>
+<span class="v">KeyLength = 2048</span>
+<span class="v">MachineKeySet = TRUE</span>
+<span class="v">RequestType = PKCS10</span>
+<span class="v">[Extensions]</span>
+<span class="v">2.5.29.17 = "{text}"</span>
+<span class="v">_continue_ = "DNS=hostname.zcam.local&"</span>
+<span class="v">_continue_ = "DNS=hostname&"</span>
+<span class="v">_continue_ = "DNS=vip.zres.lan&"</span>
+<span class="v">_continue_ = "DNS=vip"</span>
+<span class="v">2.5.29.37 = "{text}1.3.6.1.5.5.7.3.1,1.3.6.1.4.1.311.54.1.2"</span>
+
+<span class="k">certreq -new</span> request.inf request.req
+<span class="k">certreq -submit -config</span> <span class="v">"ca.zcam.local\zcam-CA"</span> request.req cert.cer
+<span class="k">certreq -accept</span> cert.cer
+
+<span class="c"># Lier le cert au service RDP</span>
+<span class="w">$thumb</span> = (<span class="k">Get-ChildItem</span> Cert:\LocalMachine\My | <span class="k">?</span> {<span class="w">$_.Subject -like "*hostname*"</span>}).Thumbprint
+<span class="k">Set-WmiInstance</span> -Path <span class="v">"\\.\root\cimv2\TerminalServices:Win32_TSGeneralSetting.TerminalName='RDP-Tcp'"</span> -Arguments @{SSLCertificateSHA1Hash=<span class="w">$thumb</span>}
+
+<span class="c"># Push GPO : Remote Desktop Session Host → Security</span>
+<span class="c"># → "Server authentication certificate template" = RDS-VIP-Cert</span></div>
+  </div>
+
+  <div class="solution-card secondary">
+    <div class="sol-header">
+      <div class="sol-num">3</div>
+      <div class="sol-title">Établir une relation d'approbation zcam ↔ zres (ou stub zone DNS)</div>
+      <span class="sol-difficulty sd-hard">DIFFICILE · plusieurs jours</span>
+      <span class="change-chip chip-orange">STRUCTURANT</span>
+    </div>
+    <p class="sol-desc">Si beaucoup de ressources zres doivent être accessibles depuis zcam, un trust externe ou de forêt apporte une solution durable. Mais pour résoudre uniquement votre problème RDP via VIP, la Solution 1 est suffisante et nettement plus rapide.</p>
+    <div class="code-block"><span class="c"># Création d'un external trust depuis un DC zcam</span>
+<span class="k">netdom trust</span> zcam.local /Domain:zres.local /Add /UserD:Administrator /PasswordD:* /UserO:Administrator /PasswordO:*
+
+<span class="c"># Vérifier le trust</span>
+<span class="k">nltest /domain_trusts /v</span>
+<span class="k">Get-ADTrust</span> -Filter *
+
+<span class="c"># Forwarder DNS conditionnel (alternative légère)</span>
+<span class="k">Add-DnsServerConditionalForwarderZone</span> -Name <span class="v">"zres.local"</span> -ReplicationScope <span class="v">"Forest"</span> -MasterServers <span class="v">10.x.x.x</span></div>
+  </div>
+
+  <div class="solution-card primary">
+    <div class="sol-header">
+      <div class="sol-num">4</div>
+      <div class="sol-title">Vérifier &amp; corriger la configuration F5 (TCP profile only)</div>
+      <span class="sol-difficulty sd-easy">FACILE · 15 min</span>
+      <span class="change-chip chip-green">CRITIQUE</span>
+    </div>
+    <p class="sol-desc">S'assurer que la VIP est en TCP bridge pur (pas de SSL termination). Si un Client SSL profile traîne, le supprimer. Vérifier que le monitor pool est <code>tcp</code> ou un monitor RDP custom.</p>
+    <div class="code-block"><span class="c"># Vérifier le Virtual Server</span>
+<span class="k">tmsh list ltm virtual</span> RDP-VIP-3389 all-properties
+<span class="c"># Profiles attendus : tcp uniquement. PAS de clientssl ni serverssl.</span>
+
+<span class="c"># Si clientssl présent → le retirer :</span>
+<span class="k">tmsh modify ltm virtual</span> RDP-VIP-3389 profiles delete { <span class="w">clientssl</span> }
+
+<span class="c"># Vérifier le pool member (doit être Available/Enabled)</span>
+<span class="k">tmsh show ltm pool</span> RDP-Pool members
+
+<span class="c"># Monitor recommandé pour RDP</span>
+<span class="k">tmsh create ltm monitor tcp</span> rdp-3389-mon { destination *:3389 interval 10 timeout 31 }
+<span class="k">tmsh modify ltm pool</span> RDP-Pool monitor rdp-3389-mon
+
+<span class="c"># SNAT — important si client et backend dans subnets différents</span>
+<span class="k">tmsh modify ltm virtual</span> RDP-VIP-3389 source-address-translation { type automap }
+
+<span class="c"># Vérifier connectivité depuis F5 vers backend</span>
+<span class="k">tmsh run util tcpdump</span> -nni 0.0:nnp host &lt;target_ip&gt; and port 3389</div>
+  </div>
+
+  <div class="solution-card workaround">
+    <div class="sol-header">
+      <div class="sol-num">5</div>
+      <div class="sol-title">Désactiver temporairement NLA sur la cible (DIAGNOSTIC uniquement)</div>
+      <span class="sol-difficulty sd-easy">FACILE · 2 min</span>
+      <span class="change-chip chip-purple">DIAGNOSTIC</span>
+    </div>
+    <p class="sol-desc">À utiliser uniquement pour valider si NLA est la cause. <strong>Ne pas garder en production</strong> : NLA est une protection essentielle contre les attaques pre-auth.</p>
+    <div class="code-block"><span class="c"># Sur la cible 23H2 (PowerShell admin)</span>
+<span class="k">Set-ItemProperty</span> -Path <span class="v">'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp'</span> -Name <span class="v">"UserAuthentication"</span> -Value <span class="v">0</span>
+<span class="k">Restart-Service</span> TermService -Force
+
+<span class="c"># Tester la connexion. Si ça marche → CredSSP/NLA est le bloqueur.</span>
+<span class="r"># IMPORTANT : RÉACTIVER NLA APRÈS LE TEST (-Value 1)</span></div>
+  </div>
+
+  <div class="solution-card secondary">
+    <div class="sol-header">
+      <div class="sol-num">6</div>
+      <div class="sol-title">Créer un alias DNS dans zcam pointant vers la VIP F5</div>
+      <span class="sol-difficulty sd-easy">FACILE · 10 min</span>
+      <span class="change-chip chip-blue">CONTOURNEMENT ÉLÉGANT</span>
+    </div>
+    <p class="sol-desc">Au lieu de demander aux clients de se connecter à <code>vip.zres.lan</code>, créer un enregistrement DNS dans zcam (ex : <code>rdp-prod.zcam.local</code>) qui résout vers l'IP de la VIP F5. Ainsi le client cherche le SPN dans son propre domaine (zcam), ce qui évite le cross-realm.</p>
+    <div class="code-block"><span class="c"># Sur DNS zcam, créer un A record</span>
+<span class="k">Add-DnsServerResourceRecordA</span> -Name <span class="v">"rdp-prod"</span> -ZoneName <span class="v">"zcam.local"</span> -IPv4Address <span class="v">"10.zres.x.x"</span>
+
+<span class="c"># Côté cible 23H2 — ajouter le SPN correspondant</span>
+<span class="k">setspn -S</span> <span class="v">TERMSRV/rdp-prod.zcam.local</span> <span class="w">HOSTNAME-CIBLE$</span>
+
+<span class="c"># Push un cert avec SAN incluant rdp-prod.zcam.local (voir Solution 2)</span>
+
+<span class="c"># Le client se connecte désormais ainsi :</span>
+<span class="k">mstsc /v:</span><span class="v">rdp-prod.zcam.local</span></div>
+    <div class="alert alert-success" style="margin-top:8px">
+      <span class="alert-icon">✨</span>
+      <div class="alert-body">
+        <strong>Pourquoi cette solution est élégante</strong>
+        Tout reste dans zcam : SPN, certificat, DNS, identité. Aucun trust nécessaire. Le F5 reste en zres mais c'est transparent — c'est juste une IP que le client atteint via un nom zcam.
+      </div>
+    </div>
+  </div>
+
+  <div class="solution-card workaround">
+    <div class="sol-header">
+      <div class="sol-num">7</div>
+      <div class="sol-title">Assouplir temporairement CredSSP côté client (TEST uniquement)</div>
+      <span class="sol-difficulty sd-easy">FACILE · 2 min</span>
+      <span class="change-chip chip-purple">DIAGNOSTIC</span>
+    </div>
+    <p class="sol-desc">Permettre temporairement un fallback CredSSP "Mitigated" pour vérifier si le durcissement Protected Mode est le bloqueur. <strong>Ne jamais conserver en production.</strong></p>
+    <div class="code-block"><span class="c"># Sur le client 25H2 (test diagnostic)</span>
+<span class="k">Set-ItemProperty</span> -Path <span class="v">'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\CredSSP\Parameters'</span> -Name <span class="v">"AllowEncryptionOracle"</span> -Value <span class="v">2</span>
+
+<span class="c">#   0 = Force Updated (défaut 25H2)  |  1 = Mitigated  |  2 = Vulnerable (DANGEREUX)</span>
+
+<span class="r"># Restaurer le défaut IMMÉDIATEMENT après le test</span>
+<span class="k">Remove-ItemProperty</span> -Path <span class="v">'HKLM:\SOFTWARE\...\CredSSP\Parameters'</span> -Name <span class="v">"AllowEncryptionOracle"</span></div>
+  </div>
+
+  <div class="solution-card tertiary">
+    <div class="sol-header">
+      <div class="sol-num">8</div>
+      <div class="sol-title">Migrer vers un RD Gateway (architecture cible long terme)</div>
+      <span class="sol-difficulty sd-hard">STRUCTURANT · projet</span>
+      <span class="change-chip chip-blue">ARCHITECTURE</span>
+    </div>
+    <p class="sol-desc">RD Gateway termine RDP sur HTTPS (port 443), authentifie les utilisateurs avec MFA possible, et établit ensuite une connexion RDP interne vers la cible. Remplace avantageusement le F5 sur ce flux et règle naturellement les problèmes de SPN/cert.</p>
+    <ul style="font-size:13px;color:var(--text-secondary);line-height:1.8;padding-left:20px;margin-bottom:14px">
+      <li><strong>Avantages</strong> : terminaison TLS sur 443 propre, cert unique valide, NLA fonctionnel, NPS policies, journalisation centralisée.</li>
+      <li><strong>F5</strong> : peut rester en load-balancing devant deux RD Gateway HA en SSL Bridge mode (cert F5 valide en frontal).</li>
+      <li><strong>Cible</strong> : reste inchangée. Le RD Gateway parle RDP standard avec elle.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="section" id="plan-action">
+  <div class="section-header">
+    <div class="section-num">08</div>
+    <div class="section-title">Plan d'action recommandé — Ordre de mise en œuvre</div>
+  </div>
+  <p class="section-desc">Séquence opérationnelle pour résoudre le problème avec un effort minimal et un risque maîtrisé. À adapter selon vos contraintes politiques et techniques.</p>
+
+  <div class="diagram-wrapper">
+    <div class="diagram-svg-area">
+      <svg viewBox="0 0 940 460" xmlns="http://www.w3.org/2000/svg" style="min-width:760px">
+        <defs>
+          <marker id="plan-ar" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#10b981"/></marker>
+        </defs>
+
+        <g>
+          <rect x="20" y="30" width="240" height="100" rx="10" fill="#0d1828" stroke="#10b981" stroke-width="2"/>
+          <text x="40" y="55" font-family="JetBrains Mono" font-size="11" font-weight="700" fill="#10b981">ÉTAPE 1 · J1 (1h)</text>
+          <text x="40" y="76" font-family="Sora" font-size="12" font-weight="700" fill="#e8f0fe">Diagnostic rapide</text>
+          <text x="40" y="92" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">• Tester mstsc /v:cible direct</text>
+          <text x="40" y="105" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">• Vérifier setspn -L cible</text>
+          <text x="40" y="118" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">• Statut pool F5</text>
+        </g>
+        <line x1="260" y1="80" x2="288" y2="80" stroke="#10b981" stroke-width="2" marker-end="url(#plan-ar)"/>
+
+        <g>
+          <rect x="290" y="30" width="240" height="100" rx="10" fill="#0d1828" stroke="#10b981" stroke-width="2"/>
+          <text x="310" y="55" font-family="JetBrains Mono" font-size="11" font-weight="700" fill="#10b981">ÉTAPE 2 · J1 (30 min)</text>
+          <text x="310" y="76" font-family="Sora" font-size="12" font-weight="700" fill="#e8f0fe">Ajouter le SPN</text>
+          <text x="310" y="92" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">setspn -S TERMSRV/vip.zres.lan</text>
+          <text x="310" y="105" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">CIBLE$ (Solution 1)</text>
+          <text x="310" y="118" font-family="JetBrains Mono" font-size="9" fill="#10b981">→ klist purge + retest</text>
+        </g>
+        <line x1="530" y1="80" x2="558" y2="80" stroke="#10b981" stroke-width="2" marker-end="url(#plan-ar)"/>
+
+        <g>
+          <rect x="560" y="30" width="240" height="100" rx="10" fill="#0d1828" stroke="#10b981" stroke-width="2"/>
+          <text x="580" y="55" font-family="JetBrains Mono" font-size="11" font-weight="700" fill="#10b981">ÉTAPE 3 · J2 (1h)</text>
+          <text x="580" y="76" font-family="Sora" font-size="12" font-weight="700" fill="#e8f0fe">Si toujours KO</text>
+          <text x="580" y="92" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">• Trace Kerberos client</text>
+          <text x="580" y="105" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">• Désactiver NLA temp (Sol 5)</text>
+          <text x="580" y="118" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">• Tester AllowEncOrac (Sol 7)</text>
+        </g>
+
+        <line x1="680" y1="130" x2="680" y2="158" stroke="#10b981" stroke-width="2" marker-end="url(#plan-ar)"/>
+        <g>
+          <rect x="560" y="160" width="240" height="100" rx="10" fill="#0d1828" stroke="#10b981" stroke-width="2"/>
+          <text x="580" y="185" font-family="JetBrains Mono" font-size="11" font-weight="700" fill="#10b981">ÉTAPE 4 · J3 (2h)</text>
+          <text x="580" y="206" font-family="Sora" font-size="12" font-weight="700" fill="#e8f0fe">Cert + alias DNS</text>
+          <text x="580" y="222" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">• Cert avec SAN multiple (Sol 2)</text>
+          <text x="580" y="235" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">• Alias rdp-prod.zcam (Sol 6)</text>
+          <text x="580" y="248" font-family="JetBrains Mono" font-size="9" fill="#10b981">→ Solution la plus propre</text>
+        </g>
+        <line x1="560" y1="210" x2="532" y2="210" stroke="#10b981" stroke-width="2" marker-end="url(#plan-ar)"/>
+
+        <g>
+          <rect x="290" y="160" width="240" height="100" rx="10" fill="#0d1828" stroke="#f59e0b" stroke-width="2"/>
+          <text x="310" y="185" font-family="JetBrains Mono" font-size="11" font-weight="700" fill="#f59e0b">ÉTAPE 5 · J4 (4h)</text>
+          <text x="310" y="206" font-family="Sora" font-size="12" font-weight="700" fill="#e8f0fe">F5 reconfig si nécessaire</text>
+          <text x="310" y="222" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">• Retirer SSL profile (Sol 4)</text>
+          <text x="310" y="235" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">• Monitor tcp-3389</text>
+          <text x="310" y="248" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">• SNAT auto-map</text>
+        </g>
+        <line x1="290" y1="210" x2="262" y2="210" stroke="#10b981" stroke-width="2" marker-end="url(#plan-ar)"/>
+
+        <g>
+          <rect x="20" y="160" width="240" height="100" rx="10" fill="#0d1828" stroke="#8b5cf6" stroke-width="2"/>
+          <text x="40" y="185" font-family="JetBrains Mono" font-size="11" font-weight="700" fill="#8b5cf6">ÉTAPE 6 · S2 (projet)</text>
+          <text x="40" y="206" font-family="Sora" font-size="12" font-weight="700" fill="#e8f0fe">Long terme</text>
+          <text x="40" y="222" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">• Plan patching 23H2 → 24H2</text>
+          <text x="40" y="235" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">• Étudier RD Gateway (Sol 8)</text>
+          <text x="40" y="248" font-family="JetBrains Mono" font-size="9" fill="#8da9cc">• Décision trust zcam/zres</text>
+        </g>
+
+        <g>
+          <rect x="290" y="320" width="510" height="100" rx="10" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="2"/>
+          <text x="545" y="345" text-anchor="middle" font-family="JetBrains Mono" font-size="12" font-weight="700" fill="#10b981">✓ ÉTAT CIBLE</text>
+          <text x="545" y="366" text-anchor="middle" font-family="Sora" font-size="13" font-weight="600" fill="#e8f0fe">Connexion RDP 25H2 → VIP F5 → 23H2 opérationnelle</text>
+          <text x="545" y="386" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#8da9cc">SPN résolu en Kerberos · Cert validé sur SAN vip.zres.lan</text>
+          <text x="545" y="402" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#8da9cc">F5 TCP bridge propre · NLA conservé · Aucun fallback NTLM</text>
+        </g>
+        <line x1="545" y1="260" x2="545" y2="318" stroke="#10b981" stroke-width="2" marker-end="url(#plan-ar)"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="alert alert-success">
+    <span class="alert-icon">🎯</span>
+    <div class="alert-body">
+      <strong>Recommandation finale</strong>
+      Commencer par <strong>Solution 1 (SPN)</strong> + <strong>Solution 4 (vérif F5)</strong>. Dans 80% des cas similaires, ces deux actions seules débloquent la situation. Si ça ne suffit pas, ajouter Solution 2 (cert SAN). La Solution 6 (alias DNS dans zcam) est la "version élégante" qui évite le débat sur le trust inter-domaines et reste la plus pérenne fonctionnellement.
+    </div>
+  </div>
+</section>
+
+<section class="section" id="annexes">
+  <div class="section-header">
+    <div class="section-num">09</div>
+    <div class="section-title">Annexes techniques — Commandes, GPO, Event IDs</div>
+  </div>
+
+  <div class="sub-title">A. Commandes de diagnostic exhaustives</div>
+  <div class="code-block"><span class="c">═══ CÔTÉ CLIENT 25H2 (zcam) ═══</span>
+
+<span class="c"># Résolution DNS</span>
+<span class="k">Resolve-DnsName</span> vip.zres.lan -Type A
+<span class="k">Resolve-DnsName</span> &lt;hostname-cible&gt;.zcam.local -Type A
+
+<span class="c"># Connectivité TCP</span>
+<span class="k">Test-NetConnection</span> vip.zres.lan -Port 3389 -InformationLevel Detailed
+
+<span class="c"># Kerberos — état des tickets</span>
+<span class="k">klist</span>  ;  <span class="k">klist purge</span>  ;  <span class="k">klist sessions</span>
+
+<span class="c"># Forcer Kerberos pour un domaine (utile si pas de trust)</span>
+<span class="k">ksetup /addkdc</span> ZCAM.LOCAL dc1.zcam.local
+
+<span class="c"># Test du SPN depuis le client</span>
+<span class="k">klist get</span> TERMSRV/vip.zres.lan
+<span class="c"># Si KDC_ERR_S_PRINCIPAL_UNKNOWN → SPN absent</span>
+
+<span class="c"># Activer le logging Kerberos verbose</span>
+<span class="k">reg add</span> "HKLM\SYSTEM\CurrentControlSet\Control\Lsa\Kerberos\Parameters" /v LogLevel /t REG_DWORD /d 1 /f
+
+<span class="c"># Capture réseau côté client</span>
+<span class="k">netsh trace start</span> capture=yes tracefile=C:\rdp-trace.etl scenario=NetConnection
+<span class="c"># [tester], puis :</span>
+<span class="k">netsh trace stop</span>  <span class="c"># convertir avec etl2pcapng</span>
+
+<span class="c">═══ CÔTÉ CIBLE 23H2 (zcam) ═══</span>
+
+<span class="k">setspn -L</span> <span class="w">%COMPUTERNAME%</span>
+
+<span class="c"># Cert utilisé par RDP</span>
+<span class="k">Get-WmiObject</span> -Class <span class="v">"Win32_TSGeneralSetting"</span> -Namespace root\cimv2\TerminalServices -Filter <span class="v">"TerminalName='RDP-Tcp'"</span> | <span class="k">Select</span> SSLCertificateSHA1Hash
+
+<span class="c"># Certs avec EKU Remote Desktop Authentication</span>
+<span class="k">Get-ChildItem</span> Cert:\LocalMachine\My | <span class="k">?</span> { <span class="w">$_.EnhancedKeyUsageList.ObjectId -contains "1.3.6.1.4.1.311.54.1.2"</span> }
+
+<span class="c"># Configuration NLA</span>
+<span class="k">Get-ItemProperty</span> -Path <span class="v">'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp'</span> -Name UserAuthentication, SecurityLayer, MinEncryptionLevel
+
+<span class="c">═══ CÔTÉ F5 BIG-IP ═══</span>
+
+<span class="k">tmsh show ltm virtual</span> RDP-VIP-3389
+<span class="k">tmsh show ltm pool</span> RDP-Pool members
+<span class="k">tmsh list ltm virtual</span> RDP-VIP-3389 profiles
+
+<span class="c"># Capture trafic (deux sens à séparer)</span>
+<span class="k">tcpdump -nni</span> 0.0:nnp host &lt;client_ip&gt; and port 3389 -w /shared/tmp/client.pcap
+<span class="k">tcpdump -nni</span> 0.0:nnp host &lt;target_ip&gt; and port 3389 -w /shared/tmp/server.pcap
+
+<span class="k">tail -f</span> /var/log/ltm</div>
+
+  <div class="sub-title">B. Event IDs Windows à surveiller</div>
+  <table class="compare-table">
+    <thead>
+      <tr><th>Event ID</th><th>Source / Log</th><th>Signification</th><th>Action</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>1024</td><td>TerminalServices-ClientActiveXCore</td><td>Tentative connexion RDP cliente</td><td>Premier point de capture</td></tr>
+      <tr><td>1026</td><td>TerminalServices-ClientActiveXCore</td><td>Échec connexion RDP avec raison</td><td>Lire le détail (CredSSP, cert)</td></tr>
+      <tr><td>1149</td><td>RemoteConnectionManager</td><td>Connexion auth réussie sur la cible</td><td>Si absent → cible jamais touchée</td></tr>
+      <tr><td>4624</td><td>Security</td><td>Logon réussi (LogonType 10 = RDP)</td><td>Côté cible</td></tr>
+      <tr><td>4625</td><td>Security</td><td>Logon échoué — Failure Reason / SubStatus</td><td>0xC000006D = mauvais nom/mdp</td></tr>
+      <tr><td>4769</td><td>Security (DC)</td><td>Kerberos service ticket request</td><td>Vérifier Status, Service Name</td></tr>
+      <tr><td>4771</td><td>Security (DC)</td><td>Kerberos pre-auth failed</td><td>Mauvais mot de passe ou clé</td></tr>
+      <tr><td>36874</td><td>Schannel</td><td>TLS requested with unsupported algorithms</td><td>Indique TLS 1.0/1.1 rejeté</td></tr>
+      <tr><td>36888</td><td>Schannel</td><td>Fatal alert sent (TLS handshake failed)</td><td>Alert code = cause</td></tr>
+      <tr><td>261</td><td>TermDD / RemoteDesktopServices</td><td>CredSSP encryption oracle remediation</td><td>Patch CredSSP des deux côtés</td></tr>
+    </tbody>
+  </table>
+
+  <div class="sub-title">C. GPO recommandées — Configuration cible homogène</div>
+  <div class="code-block"><span class="c"># Computer Config → Admin Templates → Windows Components →</span>
+<span class="c"># Remote Desktop Services → Remote Desktop Session Host → Security</span>
+
+<span class="k">Require user authentication ... Network Level Authentication</span> = <span class="v">Enabled</span>
+<span class="k">Require use of specific security layer for RDP connections</span> = <span class="v">SSL</span>
+<span class="k">Set client connection encryption level</span> = <span class="v">High Level</span>
+<span class="k">Server authentication certificate template</span> = <span class="v">RDS-VIP-Cert</span>  <span class="c"># IMPORTANT</span>
+
+<span class="c"># Security Options :</span>
+<span class="k">Network security: LAN Manager authentication level</span> = <span class="v">Send NTLMv2 response only. Refuse LM &amp; NTLM</span>
+
+<span class="c"># System → Credentials Delegation :</span>
+<span class="k">Encryption Oracle Remediation</span> = <span class="v">Force Updated Clients</span>  <span class="c"># 25H2 = défaut</span>
+<span class="c"># Transitoire si anciens clients : Mitigated, puis repasser à Force après migration</span></div>
+
+  <div class="sub-title">D. Format de cert RDP — Récapitulatif EKU et SAN</div>
+  <table class="compare-table">
+    <thead>
+      <tr><th>Composant cert</th><th>Valeur</th><th>Pourquoi</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Subject CN</td><td>FQDN principal de la cible</td><td>Identité primaire</td></tr>
+      <tr><td>SAN DNS #1</td><td>hostname.zcam.local</td><td>FQDN dans le domaine</td></tr>
+      <tr><td>SAN DNS #2</td><td>hostname (court)</td><td>Nom NetBIOS</td></tr>
+      <tr><td>SAN DNS #3</td><td><strong>vip.zres.lan</strong></td><td><strong>CRUCIAL — nom d'accès via VIP</strong></td></tr>
+      <tr><td>EKU #1</td><td>1.3.6.1.5.5.7.3.1 (Server Authentication)</td><td>Validité TLS server</td></tr>
+      <tr><td>EKU #2</td><td>1.3.6.1.4.1.311.54.1.2 (Remote Desktop Authentication)</td><td>Validation Windows RDP</td></tr>
+      <tr><td>Key length</td><td>RSA 2048 min (4096 recommandé)</td><td>Conforme 25H2 hardening</td></tr>
+      <tr><td>Signature algo</td><td>SHA-256 minimum (SHA-1 rejeté)</td><td>CredSSP Protected Mode</td></tr>
+    </tbody>
+  </table>
+
+  <div class="sub-title">E. Trace réseau — ce qu'il faut chercher</div>
+  <div class="cards-grid">
+    <div class="card info">
+      <div class="card-icon">🔍</div>
+      <div class="card-title">Wireshark — filtres utiles</div>
+      <div class="card-desc"><code style="font-family:'JetBrains Mono',monospace;background:rgba(0,0,0,0.3);padding:1px 4px;border-radius:3px;color:var(--accent-cyan);font-size:11px">tcp.port==3389</code> + <code style="font-family:'JetBrains Mono',monospace;background:rgba(0,0,0,0.3);padding:1px 4px;border-radius:3px;color:var(--accent-cyan);font-size:11px">tls.handshake</code> + <code style="font-family:'JetBrains Mono',monospace;background:rgba(0,0,0,0.3);padding:1px 4px;border-radius:3px;color:var(--accent-cyan);font-size:11px">kerberos</code>. SNI : <code style="font-family:'JetBrains Mono',monospace;background:rgba(0,0,0,0.3);padding:1px 4px;border-radius:3px;color:var(--accent-cyan);font-size:11px">tls.handshake.extension.type==0</code>.</div>
+    </div>
+    <div class="card info">
+      <div class="card-icon">📡</div>
+      <div class="card-title">TLS Alert codes</div>
+      <div class="card-desc">Alert 40 (handshake_failure) = mauvaise version TLS. Alert 42 (bad_certificate) = chaîne invalide. Alert 46 (unsupported_certificate) = cert pas reconnu (EKU manquant). Alert 71 (insufficient_security) = cipher trop faible.</div>
+    </div>
+    <div class="card info">
+      <div class="card-icon">🎫</div>
+      <div class="card-title">Kerberos — codes d'erreur</div>
+      <div class="card-desc">KRB-ERROR code 7 = S_PRINCIPAL_UNKNOWN (SPN absent). Code 25 = PREAUTH_REQUIRED (normal). Code 24 = PREAUTH_FAILED (mauvais mdp). Code 18 = CLIENT_REVOKED (compte désactivé).</div>
+    </div>
+    <div class="card info">
+      <div class="card-icon">⚡</div>
+      <div class="card-title">CredSSP — signature</div>
+      <div class="card-desc">Après TLS handshake réussi, recherche le pattern Negotiate dans le payload chiffré. Si le client ferme la session avec FIN après le 1er TLS Application Data, CredSSP a échoué.</div>
+    </div>
+  </div>
+
+  <div style="margin-top:36px;padding:24px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);text-align:center">
+    <div style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;margin-bottom:10px;letter-spacing:2px">RAPPORT TECHNIQUE · DIAGNOSTIC RDP VIP F5</div>
+    <div style="font-size:13px;color:var(--text-secondary)">Architecture : Windows 11 25H2 (zcam) → F5 BIG-IP TCP Bridge (zres) → Windows 11 23H2 (zcam)</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:8px">Document de référence interne — couvre durcissement avril 2026 / KB5083769 / CredSSP Protected Mode</div>
+    <div style="margin-top:14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+      <span class="change-chip chip-cyan">CredSSP</span>
+      <span class="change-chip chip-purple">Kerberos SPN</span>
+      <span class="change-chip chip-green">F5 BIG-IP</span>
+      <span class="change-chip chip-orange">EKU 1.3.6.1.4.1.311.54.1.2</span>
+      <span class="change-chip chip-red">NLA Enforced 25H2</span>
+    </div>
+  </div>
+</section>
+
+</div>
+</div>
+
+<script>
+function setTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  document.getElementById('btn-dark').classList.toggle('active', t === 'dark');
+  document.getElementById('btn-light').classList.toggle('active', t === 'light');
+}
+
+function setActive(el) {
+  document.querySelectorAll('.nav-item').forEach(function (i) { i.classList.remove('active'); });
+  el.classList.add('active');
+  if (window.innerWidth <= 900) closeSidebar();
+}
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('overlay').classList.toggle('open');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('overlay').classList.remove('open');
+}
+
+var sections = ['contexte', 'rdp-23h2', 'rdp-25h2', 'f5-arch', 'analyse', 'diagnostic', 'solutions', 'plan-action', 'annexes'];
+window.addEventListener('scroll', function () {
+  var current = '';
+  sections.forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el && el.getBoundingClientRect().top < 130) current = id;
+  });
+  document.querySelectorAll('.nav-item').forEach(function (item) {
+    item.classList.toggle('active', item.getAttribute('href') === '#' + current);
+  });
+});
+
+// Topology view modes
+function showTopoView(mode, btn) {
+  var svg = document.getElementById('svg-topology');
+  if (svg) {
+    var fail = svg.querySelector('#topo-fail');
+    var flow = svg.querySelector('#topo-flow-normal');
+    if (mode === 'fail') {
+      if (fail) fail.style.display = 'block';
+      if (flow) flow.style.opacity = '0.3';
+    } else {
+      if (fail) fail.style.display = 'none';
+      if (flow) flow.style.opacity = '1';
+    }
+  }
+  if (btn && btn.parentElement) {
+    btn.parentElement.querySelectorAll('.phase-btn').forEach(function (b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+  }
+}
+
+// Layer toggle for handshake diagrams
+function toggleLayerGen(diag, layer, btn) {
+  var isOn = btn.classList.contains('on');
+  if (diag === '25h2' && layer === 'fail') {
+    document.querySelectorAll('.ph-25h2-fail').forEach(function (el) {
+      el.style.transition = 'opacity 0.3s';
+      el.style.opacity = isOn ? '0.15' : '1';
+    });
+  } else {
+    var el = document.getElementById('ph-' + diag + '-' + layer);
+    if (el) { el.style.transition = 'opacity 0.3s'; el.style.opacity = isOn ? '0.15' : '1'; }
+    // Some diagrams have a second RDP group (ph-23h2-rdp2)
+    if (layer === 'rdp') {
+      var el2 = document.getElementById('ph-' + diag + '-rdp2');
+      if (el2) { el2.style.transition = 'opacity 0.3s'; el2.style.opacity = isOn ? '0.15' : '1'; }
+    }
+  }
+  btn.classList.toggle('on');
+  btn.classList.toggle('off');
+}
+
+// Animation handshake — sweeps the flow lines sequentially
+function animateHandshake(diag) {
+  var svg = document.getElementById('svg-' + diag);
+  if (!svg) return;
+  var lines = svg.querySelectorAll('line[marker-end]');
+  lines.forEach(function (line) {
+    line.style.transition = 'none';
+    line.style.strokeDasharray = '600';
+    line.style.strokeDashoffset = '600';
+  });
+  // Force reflow
+  void svg.getBoundingClientRect();
+  lines.forEach(function (line, i) {
+    line.style.transition = 'stroke-dashoffset 0.45s ease ' + (i * 0.18) + 's';
+    line.style.strokeDashoffset = '0';
+  });
+  // Reset dasharray after animation so static dashed lines render normally
+  var total = (lines.length * 0.18 + 0.5) * 1000;
+  setTimeout(function () {
+    lines.forEach(function (line) {
+      line.style.transition = 'none';
+      line.style.strokeDasharray = '';
+      line.style.strokeDashoffset = '';
+    });
+  }, total);
+}
+
+// Export PDF — reveal all hidden/dimmed groups, then print
+function exportPDF() {
+  document.querySelectorAll('[id^="ph-"]').forEach(function (el) { el.style.opacity = '1'; });
+  document.querySelectorAll('.ph-25h2-fail').forEach(function (el) { el.style.opacity = '1'; });
+  var fail = document.getElementById('topo-fail');
+  if (fail) fail.style.display = 'block';
+  setTimeout(function () { window.print(); }, 250);
+}
+</script>
+</body>
+</html>
