@@ -1,0 +1,34 @@
+# ============================================================
+#  DÉPANNAGE TEMPORAIRE — Autoriser le repli NTLM vers la VIP
+#  À exécuter EN ADMINISTRATEUR sur le POSTE CLIENT
+# ============================================================
+
+$lsa = "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\MSV1_0"
+$vip = "zxr10-lb-coop-mcn.yres.ytech"     # nom appelé par le client (= Target Resource du log)
+
+# 1) SAUVEGARDE de l'état actuel (pour pouvoir revenir en arrière)
+Get-ItemProperty $lsa |
+  Select-Object RestrictSendingNTLMTraffic, ClientAllowedNTLMServers |
+  Format-List
+#    RestrictSendingNTLMTraffic : 0 = Autoriser tout | 1 = Auditer tout | 2 = Refuser tout
+#    La liste d'exceptions ci-dessous s'applique même quand la valeur est 2 (Refuser tout).
+
+# 2) AJOUT du nom de la VIP à la liste blanche NTLM (REG_MULTI_SZ),
+#    en préservant les entrées déjà présentes
+$existing = (Get-ItemProperty -Path $lsa -Name ClientAllowedNTLMServers -ErrorAction SilentlyContinue).ClientAllowedNTLMServers
+$list = @($existing) + $vip | Where-Object { $_ } | Select-Object -Unique
+New-ItemProperty -Path $lsa -Name ClientAllowedNTLMServers -Value $list -PropertyType MultiString -Force
+
+# 3) (Optionnel — test "va/va pas" plus large) basculer le sortant en Audit au lieu de Refus total.
+#    Décommentez SEULEMENT si la seule exception ci-dessus ne suffit pas.
+# New-ItemProperty -Path $lsa -Name RestrictSendingNTLMTraffic -Value 1 -PropertyType DWord -Force
+
+# 4) VÉRIFICATION
+Get-ItemProperty $lsa |
+  Select-Object RestrictSendingNTLMTraffic, ClientAllowedNTLMServers |
+  Format-List
+
+# 5) APPLICATION immédiate + purge des tickets, puis retenter la connexion RDP
+gpupdate /force
+klist purge
+klist purge -li 0x3e7
