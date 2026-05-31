@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chaîne d'authentification RDP — VIp-coop · F5 (L4)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ================= TOKENS ================= */
+:root{
+  --bg:#0a0e16; --bg2:#0d1320; --panel:#111a28; --panel2:#15202f; --panel3:#192536;
+  --line:#1f2c3e; --line2:#2c3d54; --line3:#3a4f6b;
+  --ink:#eaf1f8; --ink2:#9db0c6; --ink3:#637791;
+  --gold:#f5b531; --cyan:#37cfe0; --violet:#9d8cff; --green:#43d39a; --red:#ff6a6a;
+  --tone:var(--cyan);
+  --grid:rgba(120,150,190,.045);
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --sans:'IBM Plex Sans',system-ui,sans-serif;
+  --disp:'Archivo',system-ui,sans-serif;
+  --shadow:0 24px 70px -28px rgba(0,0,0,.85);
+}
+[data-theme="light"]{
+  --bg:#eef1f4; --bg2:#e7ebef; --panel:#ffffff; --panel2:#f3f6fa; --panel3:#eaf0f6;
+  --line:#dde4ec; --line2:#c7d3e0; --line3:#a9bacd;
+  --ink:#0f1722; --ink2:#46566b; --ink3:#74879d;
+  --gold:#bf8409; --cyan:#0c93a4; --violet:#6a55e0; --green:#138a5e; --red:#cf3b3b;
+  --grid:rgba(40,70,110,.06);
+  --shadow:0 24px 60px -30px rgba(30,50,80,.35);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; color:var(--ink); background:var(--bg);
+  font-family:var(--sans); font-size:15px; line-height:1.55;
+  -webkit-font-smoothing:antialiased; overflow:hidden;
+  background-image:
+    linear-gradient(var(--grid) 1px,transparent 1px),
+    linear-gradient(90deg,var(--grid) 1px,transparent 1px),
+    radial-gradient(900px 520px at 92% -10%, rgba(245,181,49,.10), transparent 60%),
+    radial-gradient(720px 520px at -6% 110%, rgba(55,207,224,.08), transparent 58%);
+  background-size:34px 34px,34px 34px,100% 100%,100% 100%;
+}
+::selection{background:var(--gold);color:#0a0e16}
+
+/* ================= LAYOUT ================= */
+.app{display:grid;grid-template-rows:auto 1fr auto;height:100vh;min-height:0}
+
+/* ---- HEADER ---- */
+header{
+  display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+  padding:14px 24px;border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,var(--bg2),transparent);
+}
+.brand{display:flex;align-items:center;gap:13px;margin-right:auto;min-width:0}
+.brand .mk{width:30px;height:30px;border-radius:8px;flex:0 0 auto;position:relative;
+  background:radial-gradient(circle at 30% 30%,var(--gold),#9c6c10);box-shadow:0 0 0 4px rgba(245,181,49,.12),0 0 22px rgba(245,181,49,.35)}
+.brand .mk::after{content:"";position:absolute;inset:8px;border:2px solid #0a0e16;border-radius:3px;opacity:.55}
+.brand h1{font-family:var(--disp);font-weight:800;font-size:16px;letter-spacing:.01em;margin:0;line-height:1.1}
+.brand small{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);margin-top:2px}
+.verdict{font-family:var(--mono);font-size:12px;display:flex;gap:8px;align-items:center;
+  border:1px solid var(--line2);border-radius:999px;padding:6px 14px;background:var(--panel);white-space:nowrap}
+.verdict b{color:var(--ink)} .verdict .x{color:var(--red)} .verdict .v{color:var(--green)} .verdict .sep{color:var(--ink3)}
+.tools{display:flex;gap:9px;flex-wrap:wrap}
+.tbtn{font-family:var(--mono);font-size:12px;cursor:pointer;border:1px solid var(--line2);background:var(--panel);
+  color:var(--ink2);border-radius:9px;padding:8px 13px;display:inline-flex;gap:8px;align-items:center;transition:.16s;white-space:nowrap}
+.tbtn:hover{border-color:var(--line3);color:var(--ink)}
+.tbtn.on{border-color:var(--gold);color:var(--gold);background:rgba(245,181,49,.08)}
+.tbtn .ic{font-size:13px}
+
+/* ---- MAIN ---- */
+main{display:grid;grid-template-columns:1fr 372px;min-height:0;overflow:hidden}
+.stage{position:relative;min-width:0;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:14px 18px}
+.stage svg{width:100%;height:100%;max-height:100%;display:block}
+
+/* ---- PANEL ---- */
+.panel{border-left:1px solid var(--line);background:linear-gradient(180deg,var(--panel),var(--bg2));
+  padding:24px 24px 20px;overflow-y:auto;display:flex;flex-direction:column;gap:16px}
+.step-head{display:flex;align-items:center;gap:12px}
+.idx{font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.1em}
+.badge{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;
+  padding:5px 12px;border-radius:999px;border:1px solid var(--tone);color:var(--tone);
+  background:color-mix(in srgb,var(--tone) 12%,transparent);transition:.3s}
+.phase{font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.16em;text-transform:uppercase}
+.lead{font-family:var(--disp);font-weight:700;font-size:21px;line-height:1.22;margin:0;letter-spacing:-.01em}
+.key{border-left:3px solid var(--tone);background:color-mix(in srgb,var(--tone) 9%,transparent);
+  border-radius:0 10px 10px 0;padding:11px 14px;font-size:13.5px;color:var(--ink)}
+.key.warn{--tone:var(--red)} .key.ok{--tone:var(--green)}
+.key b{color:var(--tone)}
+.tech{border:1px solid var(--line2);border-radius:12px;padding:13px 15px;background:var(--panel2)}
+.tech .tl{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);display:flex;gap:8px;align-items:center;margin-bottom:7px}
+.tech .tl::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--gold)}
+.tech p{margin:0;font-family:var(--mono);font-size:12.5px;line-height:1.62;color:var(--ink2)}
+.tech code,.lead code,.key code{font-family:var(--mono);font-size:.92em;color:var(--gold);background:color-mix(in srgb,var(--gold) 12%,transparent);border-radius:5px;padding:1px 5px}
+.app:not(.show-tech) .tech{display:none}
+.app:not(.show-tech) .tech-anno{display:none}
+.tech-anno{display:initial}
+
+.spacer{flex:1 1 auto}
+.nodeinfo{border:1px dashed var(--line3);border-radius:12px;padding:13px 15px;background:var(--panel2)}
+.nodeinfo[hidden]{display:none}
+.nodeinfo .ni-h{display:flex;align-items:center;gap:9px;margin-bottom:6px}
+.nodeinfo .ni-dot{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
+.nodeinfo .ni-name{font-family:var(--disp);font-weight:700;font-size:15px}
+.nodeinfo .ni-fqdn{font-family:var(--mono);font-size:11px;color:var(--ink3);margin-bottom:6px}
+.nodeinfo .ni-desc{font-size:13px;color:var(--ink2)}
+.nodeinfo .ni-close{float:right;cursor:pointer;color:var(--ink3);font-family:var(--mono);font-size:14px;border:none;background:none}
+.hint{font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.04em}
+
+/* ---- TRANSPORT / TIMELINE ---- */
+footer{display:flex;align-items:center;gap:16px;padding:12px 24px;border-top:1px solid var(--line);
+  background:linear-gradient(0deg,var(--bg2),transparent)}
+.ctrls{display:flex;gap:7px;flex:0 0 auto}
+.cbtn{width:40px;height:40px;cursor:pointer;border:1px solid var(--line2);background:var(--panel);color:var(--ink);
+  border-radius:10px;font-size:17px;display:grid;place-items:center;transition:.15s}
+.cbtn:hover{border-color:var(--gold);color:var(--gold)}
+.cbtn.play{background:var(--gold);color:#0a0e16;border-color:var(--gold);font-size:15px}
+.cbtn.play:hover{filter:brightness(1.08)}
+.track{display:flex;gap:6px;flex:1 1 auto;min-width:0}
+.seg{flex:1 1 0;min-width:0;cursor:pointer;border:1px solid var(--line2);background:var(--panel);
+  border-radius:9px;padding:8px 9px;display:flex;flex-direction:column;gap:3px;transition:.18s;position:relative;overflow:hidden}
+.seg:hover{border-color:var(--line3)}
+.seg .sn{font-family:var(--mono);font-size:10px;color:var(--ink3);letter-spacing:.06em}
+.seg .sl{font-family:var(--mono);font-size:11.5px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.seg.done{background:var(--panel2)}
+.seg.done .sn{color:var(--ink2)}
+.seg.active{border-color:var(--tone);background:color-mix(in srgb,var(--tone) 12%,transparent)}
+.seg.active .sl{color:var(--ink)} .seg.active .sn{color:var(--tone)}
+.seg.active::after{content:"";position:absolute;left:0;bottom:0;height:2px;width:100%;background:var(--tone)}
+
+/* ================= SVG SEMANTIC ================= */
+.lbl-mono{font-family:var(--mono);fill:var(--ink2)}
+.node .box{fill:var(--panel);stroke:var(--line2);stroke-width:1.5;transition:stroke .35s,filter .35s}
+.node .nm{font-family:var(--disp);font-weight:700;fill:var(--ink)}
+.node .role{font-family:var(--mono);fill:var(--ink3)}
+.node .fq{font-family:var(--mono);fill:var(--ink3)}
+.node{cursor:pointer;transition:opacity .35s}
+.node .ic{stroke:var(--ink2);stroke-width:1.7;fill:none;transition:stroke .35s}
+.node.dim{opacity:.4}
+.node.on .box{stroke:var(--tone);filter:drop-shadow(0 0 9px color-mix(in srgb,var(--tone) 70%,transparent))}
+.node.on .ic{stroke:var(--tone)}
+.node.on .nm{fill:var(--ink)}
+.node.sel .box{stroke:var(--gold);stroke-dasharray:5 4}
+
+.link{stroke:var(--line2);stroke-width:2;fill:none;transition:stroke .35s,stroke-width .35s,filter .35s,opacity .35s;opacity:.7}
+.link.dash{stroke-dasharray:6 6}
+.link.on{stroke:var(--tone);stroke-width:3.2;opacity:1;filter:drop-shadow(0 0 5px color-mix(in srgb,var(--tone) 75%,transparent))}
+.geo{stroke:none;fill:none}
+#packet{fill:currentColor;filter:drop-shadow(0 0 7px currentColor);opacity:0;transition:opacity .25s}
+
+.tunnel-rect{fill:color-mix(in srgb,var(--violet) 9%,transparent);stroke:var(--violet);stroke-opacity:.5;stroke-width:1.5;stroke-dasharray:7 6;
+  opacity:0;transition:opacity .5s}
+.tunnel-lab{font-family:var(--mono);fill:var(--violet);opacity:0;transition:opacity .5s;letter-spacing:.12em}
+.tunnel-on .tunnel-rect{opacity:1}
+.tunnel-on .tunnel-lab{opacity:.85}
+
+.anno{font-family:var(--mono);fill:var(--ink3)}
+.fric{font-family:var(--mono);font-weight:600}
+.fric.f1{fill:var(--gold)} .fric.f2{fill:var(--red)}
+
+/* ================= SHEET (conditions) ================= */
+.scrim{position:fixed;inset:0;background:rgba(4,7,12,.6);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:.25s;z-index:40}
+.scrim.open{opacity:1;pointer-events:auto}
+.sheet{position:fixed;top:0;right:0;height:100vh;width:min(460px,92vw);z-index:50;background:linear-gradient(180deg,var(--panel),var(--bg2));
+  border-left:1px solid var(--line2);box-shadow:var(--shadow);transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);
+  display:flex;flex-direction:column;overflow:hidden}
+.sheet.open{transform:translateX(0)}
+.sheet header{border-bottom:1px solid var(--line);background:none;padding:18px 22px}
+.sheet h2{font-family:var(--disp);font-weight:800;font-size:18px;margin:0}
+.sheet .sub{font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.08em;margin-top:3px}
+.sheet .close{margin-left:auto;cursor:pointer;border:1px solid var(--line2);background:var(--panel2);color:var(--ink2);border-radius:9px;width:34px;height:34px;font-size:16px}
+.sheet .body{overflow-y:auto;padding:18px 22px 26px;display:flex;flex-direction:column;gap:16px}
+.cgrp{border:1px solid var(--line2);border-radius:13px;overflow:hidden;background:var(--panel2)}
+.cgrp .ch{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--panel3)}
+.cgrp .ch .num{font-family:var(--mono);font-size:11px;font-weight:600;color:#0a0e16;background:var(--gold);border-radius:6px;width:22px;height:22px;display:grid;place-items:center;flex:0 0 auto}
+.cgrp .ch b{font-family:var(--disp);font-size:14px}
+.cgrp ul{margin:0;padding:11px 16px 13px 16px;list-style:none;display:flex;flex-direction:column;gap:9px}
+.cgrp li{position:relative;padding-left:22px;font-size:13px;color:var(--ink2)}
+.cgrp li::before{content:"✓";position:absolute;left:0;top:0;color:var(--green);font-family:var(--mono);font-weight:600}
+.cgrp li b{color:var(--ink)}
+.cgrp li code{font-family:var(--mono);font-size:.9em;color:var(--gold)}
+.cnote{font-size:12.5px;color:var(--ink3);border-top:1px solid var(--line);padding-top:14px;line-height:1.6}
+.cnote b{color:var(--ink2)}
+
+/* ================= RESPONSIVE ================= */
+@media(max-width:1080px){
+  body{overflow:auto}
+  .app{height:auto;min-height:100vh;grid-template-rows:auto auto auto}
+  main{grid-template-columns:1fr}
+  .stage{height:62vh;min-height:440px}
+  .panel{border-left:none;border-top:1px solid var(--line)}
+}
+@media(max-width:620px){
+  header{padding:12px 14px;gap:12px}
+  .verdict{order:3;width:100%;justify-content:center}
+  main .stage{height:54vh;min-height:380px;padding:6px}
+  .panel{padding:18px 16px}
+  .lead{font-size:18px}
+  footer{flex-wrap:wrap;padding:12px 14px}
+  .track{order:3;width:100%}
+  .seg .sl{display:none}
+}
+@media print{
+  body{overflow:visible;background:#fff;color:#000}
+  .tools,.ctrls,.scrim,.sheet{display:none!important}
+  .app{height:auto}.stage{height:520px}
+  .panel{border-left:1px solid #ccc}
+}
+</style>
+</head>
+<body>
+<div class="app show-tech" id="app">
+
+  <!-- ============ HEADER ============ -->
+  <header>
+    <div class="brand">
+      <span class="mk"></span>
+      <div>
+        <h1>Chaîne d'authentification RDP</h1>
+        <small>VIp-coop.zres.ztech · répartiteur F5 en relais TCP (L4)</small>
+      </div>
+    </div>
+    <div class="verdict">
+      <span>Kerberos <b class="x">✗</b></span><span class="sep">·</span><span>NTLMv2 <b class="v">✓</b></span>
+    </div>
+    <div class="tools">
+      <button class="tbtn on" id="techBtn"><span class="ic">⚙</span> Détails techniques</button>
+      <button class="tbtn" id="condBtn"><span class="ic">✓</span> Conditions NTLMv2</button>
+      <button class="tbtn" id="themeBtn"><span class="ic">◑</span> Thème</button>
+    </div>
+  </header>
+
+  <!-- ============ MAIN ============ -->
+  <main>
+    <div class="stage">
+      <svg id="map" viewBox="0 0 980 650" role="img" aria-label="Carte de la chaîne d'authentification RDP à travers la VIP F5">
+        <!-- ---- tunnel band (TLS/CredSSP) ---- -->
+        <g class="tunnel">
+          <rect class="tunnel-rect" x="80" y="305" width="788" height="80" rx="40"/>
+          <text class="tunnel-lab" x="474" y="299" text-anchor="middle" font-size="11">TUNNEL TLS · CREDSSP<tspan class="tech-anno"> · chiffré</tspan></text>
+        </g>
+
+        <!-- ---- geometry path for spine packet (hidden) ---- -->
+        <path id="geo-spine" class="geo" d="M263,345 H677"/>
+
+        <!-- ---- LINKS ---- -->
+        <path id="lnk-tcp" class="link" d="M263,345 H385"/>
+        <path id="lnk-fwd" class="link dash" d="M555,345 H677"/>
+        <path id="lnk-kerb" class="link" d="M178,308 Q205,222 300,151"/>
+        <path id="lnk-net" class="link" d="M752,382 Q818,442 838,520"/>
+
+        <!-- ---- link annotations (tech) ---- -->
+        <g class="tech-anno">
+          <text class="anno" x="324" y="335" text-anchor="middle" font-size="10">TCP 3389</text>
+          <text class="anno" x="616" y="335" text-anchor="middle" font-size="10">relais L4 (brut)</text>
+          <text class="anno" x="222" y="232" text-anchor="middle" font-size="10">Kerberos · 88</text>
+          <text class="anno" x="806" y="452" text-anchor="middle" font-size="10">Netlogon</text>
+          <text class="fric f1" x="752" y="298" text-anchor="middle" font-size="10">① identité TLS · SAN</text>
+          <text class="fric f2" x="300" y="170" text-anchor="middle" font-size="10">② aucun SPN</text>
+        </g>
+
+        <!-- ---- NODES ---- -->
+        <!-- KDC -->
+        <g class="node" id="node-kdc" tabindex="0">
+          <rect class="box" x="226" y="89" width="148" height="58" rx="12"/>
+          <path class="ic" d="M243,118 a6,6 0 1,0 0.01,0 M249,118 H263 M263,114 V122 M260,114 V122"/>
+          <text class="nm" x="277" y="113" font-size="13">KDC</text>
+          <text class="role" x="277" y="130" font-size="9.5">Active Directory · AS/TGS</text>
+        </g>
+        <!-- CLIENT -->
+        <g class="node" id="node-client" tabindex="0">
+          <rect class="box" x="93" y="308" width="170" height="74" rx="13"/>
+          <rect class="ic" x="112" y="332" width="26" height="18" rx="2"/>
+          <path class="ic" d="M121,350 v5 M129,350 v5 M117,355 h16"/>
+          <text class="nm" x="150" y="338" font-size="13.5">MachineClient</text>
+          <text class="role" x="150" y="354" font-size="9.5">poste utilisateur · mstsc</text>
+          <text class="fq" x="150" y="369" font-size="9">MachineClient.zcam.ztech</text>
+        </g>
+        <!-- F5 -->
+        <g class="node" id="node-f5" tabindex="0">
+          <rect class="box" x="385" y="308" width="170" height="74" rx="13"/>
+          <path class="ic" d="M404,335 l11,-6 l11,6 l-11,6 z M404,343 l11,6 l11,-6 M404,351 l11,6 l11,-6"/>
+          <text class="nm" x="452" y="338" font-size="13.5">VIp-coop (F5)</text>
+          <text class="role" x="452" y="354" font-size="9.5">relais TCP · L4 · sans SPN</text>
+          <text class="fq" x="452" y="369" font-size="9">VIp-coop.zres.ztech</text>
+        </g>
+        <!-- DEST -->
+        <g class="node" id="node-dest" tabindex="0">
+          <rect class="box" x="667" y="308" width="170" height="74" rx="13"/>
+          <rect class="ic" x="686" y="330" width="22" height="9" rx="2"/>
+          <rect class="ic" x="686" y="343" width="22" height="9" rx="2"/>
+          <path class="ic" d="M690,334 h0.01 M690,347 h0.01"/>
+          <text class="nm" x="728" y="338" font-size="13">MachineDestination</text>
+          <text class="role" x="728" y="354" font-size="9.5">hôte cible · TermService</text>
+          <text class="fq" x="728" y="369" font-size="9">MachineDestination.zcam.ztech</text>
+        </g>
+        <!-- DC -->
+        <g class="node" id="node-dc" tabindex="0">
+          <rect class="box" x="763" y="520" width="150" height="58" rx="12"/>
+          <path class="ic" d="M780,538 a8,4 0 1,0 16,0 a8,4 0 1,0 -16,0 M780,538 v9 a8,4 0 0,0 16,0 v-9"/>
+          <text class="nm" x="812" y="544" font-size="13">DC · Netlogon</text>
+          <text class="role" x="812" y="561" font-size="9.5">Active Directory</text>
+        </g>
+        <!-- ---- moving packet (drawn on top) ---- -->
+        <circle id="packet" r="5.5"/>
+      </svg>
+    </div>
+
+    <!-- ============ PANEL ============ -->
+    <aside class="panel">
+      <div class="step-head">
+        <span class="idx" id="pIdx">01 / 08</span>
+        <span class="badge" id="pBadge">Réseau</span>
+      </div>
+      <div class="phase" id="pPhase">Transport · niveau 4</div>
+      <h2 class="lead" id="pLead">—</h2>
+      <div class="key" id="pKey" hidden></div>
+      <div class="tech">
+        <span class="tl">Détail technique</span>
+        <p id="pTech">—</p>
+      </div>
+      <div class="spacer"></div>
+      <div class="nodeinfo" id="nodeInfo" hidden>
+        <button class="ni-close" id="niClose" aria-label="Fermer">✕</button>
+        <div class="ni-h"><span class="ni-dot" id="niDot"></span><span class="ni-name" id="niName"></span></div>
+        <div class="ni-fqdn" id="niFqdn"></div>
+        <div class="ni-desc" id="niDesc"></div>
+      </div>
+      <div class="hint">Astuce : ◀ ▶ pour naviguer · Espace pour lire/pause · cliquez un nœud pour son rôle.</div>
+    </aside>
+  </main>
+
+  <!-- ============ TRANSPORT ============ -->
+  <footer>
+    <div class="ctrls">
+      <button class="cbtn" id="prevBtn" aria-label="Étape précédente">‹</button>
+      <button class="cbtn play" id="playBtn" aria-label="Lecture / pause">⏸</button>
+      <button class="cbtn" id="nextBtn" aria-label="Étape suivante">›</button>
+    </div>
+    <div class="track" id="track"></div>
+  </footer>
+</div>
+
+<!-- ============ SHEET : CONDITIONS NTLMv2 ============ -->
+<div class="scrim" id="scrim"></div>
+<aside class="sheet" id="sheet" aria-hidden="true">
+  <header>
+    <div style="display:flex;align-items:flex-start;gap:12px">
+      <div>
+        <h2>Conditions de bon fonctionnement — NTLMv2</h2>
+        <div class="sub">une fois NTLM autorisé · à travers la VIP F5 (L4)</div>
+      </div>
+      <button class="close" id="sheetClose" aria-label="Fermer">✕</button>
+    </div>
+  </header>
+  <div class="body">
+    <div class="cgrp">
+      <div class="ch"><span class="num">1</span><b>CredSSP / NLA laisse arriver jusqu'à NTLM</b></div>
+      <ul>
+        <li><b>Identité TLS valide</b> : le certificat de MachineDestination couvre <code>VIp-coop.zres.ztech</code> dans son SAN (+ EKU Remote Desktop Authentication). <b>Déjà en place.</b></li>
+        <li><b>Kerberos échoue proprement</b> : aucun SPN <code>TERMSRV/VIp-coop</code> ni <code>HOST/VIp-coop</code> sur un compte → SSPI bascule.</li>
+        <li><b>Patch CredSSP aligné</b> des deux côtés (Encryption Oracle Remediation, CVE-2018-0886).</li>
+      </ul>
+    </div>
+    <div class="cgrp">
+      <div class="ch"><span class="num">2</span><b>NTLMv2 accepté des deux côtés</b></div>
+      <ul>
+        <li><b>LmCompatibilityLevel</b> ≥ 3 (idéal 5) sur le client et MachineDestination.</li>
+        <li>L'exception <b>Restrict NTLM</b> vise le nom de connexion <code>VIp-coop.zres.ztech</code>, pas le nom de l'hôte cible.</li>
+        <li>Sécurité de session compatible (128 bits + NTLMv2 session security) — défaut sur Win11.</li>
+      </ul>
+    </div>
+    <div class="cgrp">
+      <div class="ch"><span class="num">3</span><b>La validation des identifiants peut se faire</b></div>
+      <ul>
+        <li>MachineDestination jointe au domaine, <b>canal sécurisé sain</b> (<code>Test-ComputerSecureChannel</code>).</li>
+        <li>Un <b>DC joignable</b> et réactif pour le domaine de l'utilisateur (chemin d'approbation OK en multi-domaine).</li>
+        <li>Compte utilisateur valide : activé, non verrouillé, mot de passe correct, heures/stations autorisées.</li>
+      </ul>
+    </div>
+    <div class="cgrp">
+      <div class="ch"><span class="num">4</span><b>Spécifique au relais L4 / F5</b></div>
+      <ul>
+        <li>Le F5 reste en <b>pur L4</b> (pas de terminaison/bridging TLS) — sinon CredSSP casse (clé publique différente).</li>
+        <li>Tout le trio NEGOTIATE / CHALLENGE / AUTHENTICATE reste sur le <b>même backend</b> : persistance <code>source-address</code> + idle timeout ≥ durée de session.</li>
+      </ul>
+    </div>
+    <div class="cnote">
+      <b>Non requis (contrairement à Kerberos)</b> : aucun SPN, le nom <code>VIp-coop</code> n'entre jamais dans le calcul cryptographique, et la synchronisation d'horloge n'est pas bloquante.
+    </div>
+  </div>
+</aside>
+
+<script>
+/* ===================== DATA ===================== */
+const TONES={cyan:'var(--cyan)',violet:'var(--violet)',gold:'var(--gold)',red:'var(--red)',green:'var(--green)'};
+
+const STEPS=[
+  { tone:'cyan',  badge:'Réseau',     phase:'Transport · niveau 4',
+    lead:'Le poste se connecte à l’adresse virtuelle. Le boîtier F5 transmet le flux tel quel, sans le déchiffrer.',
+    tech:'DNS résout <code>VIp-coop.zres.ztech</code> vers l’IP de la VIP. Handshake TCP sur le port <code>3389</code>. Le F5, en relais de niveau 4, ouvre une connexion vers un backend du pool et relaie les octets bruts — aucune terminaison, persistance source-address.',
+    nodes:['client','f5','dest'], links:['lnk-tcp','lnk-fwd'], packet:{path:'geo-spine',reverse:false}, tunnel:false },
+
+  { tone:'cyan',  badge:'NLA',        phase:'Authentification réseau',
+    lead:'Avant d’afficher le moindre bureau, Windows exige une authentification réseau.',
+    tech:'Négociation X.224 : le client annonce <code>PROTOCOL_HYBRID</code> (CredSSP / NLA). Le serveur l’accepte → l’authentification s’exécute <em>avant</em> toute ouverture de session graphique.',
+    nodes:['client','f5','dest'], links:['lnk-tcp','lnk-fwd'], packet:{path:'geo-spine',reverse:false}, tunnel:false },
+
+  { tone:'violet',badge:'TLS · CredSSP', phase:'Canal chiffré + identité',
+    lead:'Un canal chiffré s’ouvre. Le serveur prouve son identité pour le nom appelé par le client.',
+    tech:'Handshake TLS. MachineDestination présente un certificat dont le SAN couvre <code>VIp-coop.zres.ztech</code> (+ EKU Remote Desktop Authentication). La condition d’identité de CredSSP est satisfaite — sinon « l’identité de l’ordinateur distant ne peut pas être vérifiée ».',
+    key:{type:'ok',html:'<b>Point clé ①</b> — l’identité passe parce que le certificat couvre le nom <code>VIp-coop.zres.ztech</code>, et non celui de l’hôte cible.'},
+    nodes:['client','f5','dest'], links:['lnk-tcp','lnk-fwd'], packet:{path:'geo-spine',reverse:false}, tunnel:true },
+
+  { tone:'gold',  badge:'Kerberos',   phase:'Tentative — méthode forte',
+    lead:'Le système tente d’abord la méthode la plus forte : Kerberos.',
+    tech:'SSPI demande au KDC un ticket de service pour le SPN <code>TERMSRV/VIp-coop</code> (échanges AS puis TGS, sur le canal Kerberos port 88, distinct du tunnel RDP).',
+    nodes:['client','kdc'], links:['lnk-kerb'], packet:{path:'lnk-kerb',reverse:false}, tunnel:true },
+
+  { tone:'red',   badge:'Échec K.',   phase:'Kerberos ne s’applique pas',
+    lead:'Kerberos ne peut pas fonctionner derrière ce type de répartiteur. C’est attendu et sans gravité.',
+    tech:'Aucun compte ne porte le SPN <code>TERMSRV/VIp-coop</code> (choix volontaire) → <code>KRB5KDC_ERR_S_PRINCIPAL_UNKNOWN</code>. Même produit, le ticket serait indéchiffrable par le backend (clé ≠). SSPI bascule alors proprement.',
+    key:{type:'warn',html:'<b>Point clé ②</b> — sans SPN sur la VIP, Kerberos s’arrête ici. C’est le déclencheur volontaire du repli.'},
+    nodes:['kdc','client'], links:['lnk-kerb'], packet:{path:'lnk-kerb',reverse:true}, tunnel:true },
+
+  { tone:'cyan',  badge:'Repli NTLMv2', phase:'Bascule — méthode compatible',
+    lead:'Le système bascule automatiquement vers NTLMv2, directement avec le serveur cible.',
+    tech:'Défi / réponse NTLMv2 (NEGOTIATE → CHALLENGE → AUTHENTICATE) dans le tunnel TLS, à travers le F5. Le défi est émis par l’hôte <em>terminal</em> ; réponse = <code>HMAC-MD5(NTOWFv2, défi + blob)</code>. Le nom <code>VIp-coop</code> n’entre jamais dans le calcul.',
+    nodes:['client','f5','dest'], links:['lnk-tcp','lnk-fwd'], packet:{path:'geo-spine',reverse:false}, tunnel:true },
+
+  { tone:'green', badge:'Netlogon',   phase:'Vérification par l’annuaire',
+    lead:'Le serveur fait valider l’utilisateur par un contrôleur de domaine.',
+    tech:'MachineDestination transmet la réponse au DC via le canal sécurisé <code>Netlogon</code> (pass-through). Le DC valide et renvoie la clé de session. Nécessite un canal machine sain et un DC joignable.',
+    nodes:['dest','dc'], links:['lnk-net'], packet:{path:'lnk-net',reverse:false}, tunnel:true },
+
+  { tone:'green', badge:'Accès accordé', phase:'Session ouverte',
+    lead:'L’identité est prouvée. L’utilisateur accède à sa session sur le serveur.',
+    tech:'Délégation des identifiants via CredSSP (<code>TSRequest</code>, protection anti-oracle CVE-2018-0886) puis ouverture complète de la session RDP. Le bureau de MachineDestination s’affiche.',
+    key:{type:'ok',html:'<b>Connexion établie.</b> Toute la chaîne repose sur NTLMv2 — pas sur Kerberos. Le F5 n’a été qu’un tuyau.'},
+    nodes:['client','f5','dest'], links:['lnk-tcp','lnk-fwd'], packet:{path:'geo-spine',reverse:true}, tunnel:true },
+];
+
+const SHORT=['Réseau','NLA','TLS','Kerberos','Échec','NTLMv2','Netlogon','Session'];
+
+const NODES={
+  client:{name:'MachineClient', fqdn:'MachineClient.zcam.ztech', color:'var(--cyan)',
+    desc:'Poste utilisateur — client RDP (mstsc) avec sa pile SSPI / CredSSP. Initie la connexion vers le nom virtuel et choisit le protocole d’authentification.'},
+  f5:{name:'VIp-coop (F5)', fqdn:'VIp-coop.zres.ztech', color:'var(--gold)',
+    desc:'Adresse virtuelle sur répartiteur F5, en relais TCP de niveau 4. Transmet les octets vers un backend du pool. Ne termine ni TLS ni l’authentification, et ne porte aucun SPN.'},
+  dest:{name:'MachineDestination', fqdn:'MachineDestination.zcam.ztech', color:'var(--violet)',
+    desc:'Hôte cible du pool. Termine réellement TCP / TLS et la session (TermService). C’est le côté serveur de CredSSP / NLA et l’émetteur du défi NTLM.'},
+  kdc:{name:'Active Directory — KDC', fqdn:'rôle AS / TGS · krbtgt', color:'var(--gold)',
+    desc:'Délivre les tickets Kerberos. Répond ici S_PRINCIPAL_UNKNOWN faute de SPN pour le nom virtuel, ce qui déclenche le repli NTLMv2.'},
+  dc:{name:'Active Directory — DC', fqdn:'rôle Netlogon', color:'var(--green)',
+    desc:'Valide la réponse NTLMv2 via le canal sécurisé Netlogon et renvoie la clé de session au serveur cible.'},
+};
+
+/* ===================== STATE ===================== */
+let i=0, playing=true, schedTimer=null, rafId=null;
+const app=document.getElementById('app');
+const svg=document.getElementById('map');
+const packet=document.getElementById('packet');
+const ALL_NODES=['client','f5','dest','kdc','dc'];
+const ALL_LINKS=['lnk-tcp','lnk-fwd','lnk-kerb','lnk-net'];
+const DUR=5200; // autoplay dwell
+
+/* build timeline */
+const track=document.getElementById('track');
+SHORT.forEach((s,idx)=>{
+  const seg=document.createElement('button');
+  seg.className='seg'; seg.dataset.i=idx;
+  seg.innerHTML='<span class="sn">0'+(idx+1)+'</span><span class="sl">'+s+'</span>';
+  seg.addEventListener('click',()=>{ go(idx); pause(); });
+  track.appendChild(seg);
+});
+const segs=[...track.children];
+
+/* ===================== PACKET ANIMATION ===================== */
+function runPacket(pathId, reverse, color){
+  cancelAnimationFrame(rafId);
+  const path=document.getElementById(pathId);
+  if(!path){ packet.style.opacity=0; return; }
+  const len=path.getTotalLength();
+  packet.style.color=color;       // drives drop-shadow
+  packet.setAttribute('fill',color);
+  let start=null; const cyc=1700;
+  function frame(ts){
+    if(start===null) start=ts;
+    const t=((ts-start)%cyc)/cyc;
+    const d=reverse?(1-t):t;
+    const p=path.getPointAtLength(d*len);
+    packet.setAttribute('cx',p.x.toFixed(1));
+    packet.setAttribute('cy',p.y.toFixed(1));
+    const edge=Math.min(t,1-t);
+    packet.style.opacity=Math.min(1, edge*7+0.12).toFixed(2);
+    rafId=requestAnimationFrame(frame);
+  }
+  rafId=requestAnimationFrame(frame);
+}
+
+/* ===================== RENDER ===================== */
+function render(){
+  const s=STEPS[i];
+  const tone=TONES[s.tone];
+  svg.style.setProperty('--tone',tone);
+  document.querySelector('.panel').style.setProperty('--tone',tone);
+
+  // panel
+  document.getElementById('pIdx').textContent='0'+(i+1)+' / 08';
+  const badge=document.getElementById('pBadge'); badge.textContent=s.badge; badge.style.setProperty('--tone',tone);
+  document.getElementById('pPhase').textContent=s.phase;
+  document.getElementById('pLead').innerHTML=s.lead;
+  document.getElementById('pTech').innerHTML=s.tech;
+  const k=document.getElementById('pKey');
+  if(s.key){ k.hidden=false; k.className='key '+(s.key.type||''); k.innerHTML=s.key.html; }
+  else { k.hidden=true; }
+
+  // nodes
+  ALL_NODES.forEach(n=>{
+    const el=document.getElementById('node-'+n);
+    el.classList.toggle('dim', !s.nodes.includes(n));
+    el.classList.toggle('on', s.nodes.includes(n));
+  });
+  // links
+  ALL_LINKS.forEach(l=>{
+    document.getElementById(l).classList.toggle('on', s.links.includes(l));
+  });
+  // tunnel
+  svg.classList.toggle('tunnel-on', !!s.tunnel);
+
+  // packet
+  runPacket(s.packet.path, s.packet.reverse, tone);
+
+  // timeline
+  segs.forEach((seg,idx)=>{
+    seg.classList.toggle('active', idx===i);
+    seg.classList.toggle('done', idx<i);
+    if(idx===i) seg.style.setProperty('--tone',tone);
+  });
+}
+
+/* ===================== NAV ===================== */
+function go(n){ i=(n+STEPS.length)%STEPS.length; render(); schedule(); }
+function next(){ go(i+1); }
+function prev(){ go(i-1); }
+function schedule(){ clearTimeout(schedTimer); if(playing){ schedTimer=setTimeout(()=>{ go(i+1); }, DUR); } }
+function setPlay(v){ playing=v; document.getElementById('playBtn').textContent=playing?'⏸':'▶'; schedule(); }
+function pause(){ setPlay(false); }
+
+document.getElementById('nextBtn').addEventListener('click',()=>{ next(); pause(); });
+document.getElementById('prevBtn').addEventListener('click',()=>{ prev(); pause(); });
+document.getElementById('playBtn').addEventListener('click',()=>setPlay(!playing));
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'){ next(); pause(); e.preventDefault(); }
+  else if(e.key==='ArrowLeft'){ prev(); pause(); e.preventDefault(); }
+  else if(e.key===' '){ setPlay(!playing); e.preventDefault(); }
+  else if(e.key==='Escape'){ closeSheet(); clearNode(); }
+});
+
+/* ===================== NODE SELECT ===================== */
+const niBox=document.getElementById('nodeInfo');
+function selectNode(n){
+  ALL_NODES.forEach(x=>document.getElementById('node-'+x).classList.toggle('sel',x===n));
+  const d=NODES[n];
+  document.getElementById('niDot').style.background=d.color;
+  document.getElementById('niName').textContent=d.name;
+  document.getElementById('niFqdn').textContent=d.fqdn;
+  document.getElementById('niDesc').textContent=d.desc;
+  niBox.hidden=false;
+}
+function clearNode(){ niBox.hidden=true; ALL_NODES.forEach(x=>document.getElementById('node-'+x).classList.remove('sel')); }
+ALL_NODES.forEach(n=>{
+  const el=document.getElementById('node-'+n);
+  el.addEventListener('click',()=>selectNode(n));
+  el.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ selectNode(n); e.preventDefault(); }});
+});
+document.getElementById('niClose').addEventListener('click',clearNode);
+
+/* ===================== TOGGLES ===================== */
+document.getElementById('techBtn').addEventListener('click',function(){
+  app.classList.toggle('show-tech');
+  this.classList.toggle('on', app.classList.contains('show-tech'));
+});
+document.getElementById('themeBtn').addEventListener('click',()=>{
+  const r=document.documentElement;
+  r.dataset.theme = r.dataset.theme==='dark' ? 'light' : 'dark';
+  // re-tint current step (CSS vars changed)
+  render();
+});
+
+/* sheet */
+const sheet=document.getElementById('sheet'), scrim=document.getElementById('scrim');
+function openSheet(){ sheet.classList.add('open'); scrim.classList.add('open'); sheet.setAttribute('aria-hidden','false'); }
+function closeSheet(){ sheet.classList.remove('open'); scrim.classList.remove('open'); sheet.setAttribute('aria-hidden','true'); }
+document.getElementById('condBtn').addEventListener('click',openSheet);
+document.getElementById('sheetClose').addEventListener('click',closeSheet);
+scrim.addEventListener('click',closeSheet);
+
+/* pause autoplay when tab hidden */
+document.addEventListener('visibilitychange',()=>{ if(document.hidden){ clearTimeout(schedTimer); } else { schedule(); } });
+
+/* ===================== INIT ===================== */
+render();
+setPlay(true);
+</script>
+</body>
+</html>
