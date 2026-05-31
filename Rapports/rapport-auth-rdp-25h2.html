@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Authentification RDP via VIP F5 — Kerberos & NTLMv2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================ TOKENS ============================ */
+:root{
+  --bg:#0d1117; --bg-2:#11161f; --panel:#161c27; --panel-2:#1b2230;
+  --line:#26303f; --line-2:#323e50;
+  --ink:#e6edf3; --ink-2:#9fb0c3; --ink-3:#6b7d92;
+  --gold:#f5a623; --gold-soft:#3a2e16; --gold-line:#7a5a1c;
+  --cyan:#36c5d6; --cyan-soft:#0f2f33;
+  --red:#ff5d5d; --red-soft:#3a1a1d;
+  --green:#46d18a; --green-soft:#10301f;
+  --violet:#9b8cff;
+  --shadow:0 18px 50px -20px rgba(0,0,0,.7);
+  --radius:14px;
+  --mono:'IBM Plex Mono',monospace;
+  --sans:'IBM Plex Sans',sans-serif;
+  --display:'Chivo',sans-serif;
+  --nav-w:268px;
+}
+[data-theme="light"]{
+  --bg:#f4f1ea; --bg-2:#efeae0; --panel:#fffdf8; --panel-2:#f7f3ea;
+  --line:#e0d8c8; --line-2:#cfc4ad;
+  --ink:#1c2230; --ink-2:#4a5566; --ink-3:#7d8aa0;
+  --gold:#b9760a; --gold-soft:#f6e8cd; --gold-line:#d9a850;
+  --cyan:#0d7c8c; --cyan-soft:#d7eef1;
+  --red:#c0322f; --red-soft:#f6dcdb;
+  --green:#1f8a55; --green-soft:#d8efe1;
+  --shadow:0 18px 50px -28px rgba(40,30,10,.35);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:var(--sans); font-size:16px; line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+  background-image:
+    radial-gradient(900px 500px at 88% -8%, rgba(245,166,35,.10), transparent 60%),
+    radial-gradient(700px 500px at -5% 12%, rgba(54,197,214,.07), transparent 55%);
+}
+::selection{background:var(--gold);color:#0d1117}
+
+/* ============================ LAYOUT ============================ */
+.shell{display:flex; min-height:100vh}
+nav.side{
+  width:var(--nav-w); flex:0 0 var(--nav-w); position:sticky; top:0; height:100vh;
+  overflow-y:auto; padding:26px 18px; border-right:1px solid var(--line);
+  background:linear-gradient(180deg,var(--bg-2),var(--bg));
+}
+main{flex:1; min-width:0; max-width:1180px; margin:0 auto; padding:44px 52px 120px}
+
+/* ============================ NAV ============================ */
+.brand{display:flex;gap:11px;align-items:center;margin-bottom:6px}
+.brand .dot{width:13px;height:13px;border-radius:3px;background:var(--gold);box-shadow:0 0 0 4px var(--gold-soft);flex:0 0 auto}
+.brand b{font-family:var(--display);font-weight:900;font-size:15px;letter-spacing:.02em}
+.brand small{display:block;font-family:var(--mono);font-size:10.5px;color:var(--ink-3);letter-spacing:.08em;text-transform:uppercase;margin-top:2px}
+.navgroup{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);margin:22px 8px 8px}
+nav.side a{
+  display:flex;gap:10px;align-items:baseline; text-decoration:none; color:var(--ink-2);
+  font-size:14px; padding:8px 11px; border-radius:9px; line-height:1.35;
+  border:1px solid transparent; transition:.16s;
+}
+nav.side a .n{font-family:var(--mono);font-size:11px;color:var(--ink-3);min-width:20px}
+nav.side a:hover{background:var(--panel);color:var(--ink)}
+nav.side a.active{background:var(--panel-2);color:var(--ink);border-color:var(--gold-line)}
+nav.side a.active .n{color:var(--gold)}
+
+/* ============================ HEADER ============================ */
+.hero{margin-bottom:38px}
+.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold)}
+h1{font-family:var(--display);font-weight:900;font-size:clamp(30px,5vw,52px);line-height:1.02;margin:.28em 0 .25em;letter-spacing:-.015em}
+.lede{font-size:18px;color:var(--ink-2);max-width:65ch}
+.machines{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+.chip{font-family:var(--mono);font-size:12.5px;border:1px solid var(--line-2);border-radius:999px;padding:6px 13px;background:var(--panel);display:flex;gap:8px;align-items:center}
+.chip i{width:8px;height:8px;border-radius:50%;font-style:normal}
+.chip.c1 i{background:var(--cyan)} .chip.c2 i{background:var(--gold)} .chip.c3 i{background:var(--violet)}
+.chip b{color:var(--ink)} .chip span{color:var(--ink-3)}
+
+/* ============================ SECTIONS ============================ */
+section{padding-top:30px;margin-top:30px;border-top:1px solid var(--line);scroll-margin-top:20px}
+section:first-of-type{border-top:none}
+h2{font-family:var(--display);font-weight:700;font-size:27px;letter-spacing:-.01em;margin:.2em 0 .5em;display:flex;align-items:center;gap:12px}
+h2 .tag{font-family:var(--mono);font-size:12px;color:var(--gold);border:1px solid var(--gold-line);border-radius:7px;padding:2px 9px;font-weight:500}
+h3{font-family:var(--display);font-weight:700;font-size:19px;margin:1.6em 0 .5em}
+p{margin:.7em 0;max-width:72ch}
+a.inl{color:var(--gold);text-underline-offset:3px}
+code{font-family:var(--mono);font-size:.88em;background:var(--panel-2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--gold)}
+strong{color:var(--ink)}
+ul,ol{max-width:72ch;padding-left:1.25em}
+li{margin:.4em 0}
+mark{background:var(--gold-soft);color:var(--gold);padding:0 4px;border-radius:4px}
+
+/* ============================ CARDS / CALLOUTS ============================ */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px 24px;box-shadow:var(--shadow)}
+.grid{display:grid;gap:16px}
+.note{border-left:3px solid var(--gold);background:var(--gold-soft);border-radius:0 10px 10px 0;padding:14px 18px;margin:18px 0}
+.note.warn{border-color:var(--red);background:var(--red-soft)}
+.note.ok{border-color:var(--green);background:var(--green-soft)}
+.note .lab{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);display:block;margin-bottom:3px}
+.note.warn .lab{color:var(--red)} .note.ok .lab{color:var(--green)}
+.note p{margin:.2em 0;max-width:none}
+
+pre.cmd{font-family:var(--mono);font-size:13px;background:#0a0e14;color:#cdd9e5;border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;line-height:1.55}
+[data-theme="light"] pre.cmd{background:#1c2230;color:#e6edf3}
+pre.cmd .c{color:var(--ink-3)} pre.cmd .k{color:var(--gold)} pre.cmd .s{color:var(--cyan)}
+
+/* ============================ DIAGRAM PANEL ============================ */
+.viz{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;margin:20px 0}
+.viz-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:13px 16px;border-bottom:1px solid var(--line);background:var(--panel-2)}
+.viz-bar .ttl{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);margin-right:auto}
+.btn{font-family:var(--mono);font-size:12.5px;cursor:pointer;border:1px solid var(--line-2);background:var(--panel);color:var(--ink);border-radius:8px;padding:6px 12px;display:inline-flex;gap:7px;align-items:center;transition:.15s}
+.btn:hover{border-color:var(--gold-line);color:var(--gold)}
+.btn.primary{background:var(--gold);color:#0d1117;border-color:var(--gold);font-weight:600}
+.btn.primary:hover{filter:brightness(1.08);color:#0d1117}
+.viz-body{padding:8px 10px 14px;overflow-x:auto}
+.viz svg{width:100%;height:auto;display:block;min-width:620px}
+
+/* phase + layer controls */
+.controls{display:flex;flex-wrap:wrap;gap:18px;padding:12px 16px;border-top:1px solid var(--line);background:var(--bg-2)}
+.ctl-block{display:flex;flex-direction:column;gap:7px}
+.ctl-block .h{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.pill{font-family:var(--mono);font-size:11.5px;cursor:pointer;border:1px solid var(--line-2);background:var(--panel);color:var(--ink-2);border-radius:999px;padding:4px 11px;transition:.14s}
+.pill:hover{color:var(--ink)}
+.pill.on{background:var(--gold-soft);border-color:var(--gold-line);color:var(--gold)}
+.lyr{display:flex;gap:7px;align-items:center;font-size:13px;cursor:pointer;color:var(--ink-2);user-select:none}
+.lyr input{appearance:none;width:15px;height:15px;border:1px solid var(--line-2);border-radius:4px;background:var(--panel);cursor:pointer;position:relative;flex:0 0 auto}
+.lyr input:checked{background:var(--gold);border-color:var(--gold)}
+.lyr input:checked::after{content:"✓";position:absolute;inset:0;color:#0d1117;font-size:11px;display:grid;place-items:center;font-weight:700}
+
+/* SVG semantic classes */
+.lifeline{stroke:var(--line-2);stroke-width:1.5;stroke-dasharray:3 5}
+.actorbox{fill:var(--panel-2);stroke:var(--line-2)}
+.actorlabel{font-family:var(--mono);font-size:13px;fill:var(--ink);font-weight:600}
+.actorsub{font-family:var(--mono);font-size:10px;fill:var(--ink-3)}
+.msg{font-family:var(--mono);font-size:12px;fill:var(--ink-2)}
+.msgnum{font-family:var(--mono);font-size:11px;fill:var(--ink-3);font-weight:600}
+.arrow{stroke:var(--ink-2);stroke-width:1.8;fill:none}
+.arrow.gold{stroke:var(--gold)} .arrow.cyan{stroke:var(--cyan)} .arrow.red{stroke:var(--red)} .arrow.green{stroke:var(--green)}
+.ticket{font-family:var(--mono);font-size:10.5px}
+.annot{font-family:var(--mono);font-size:10.5px;fill:var(--ink-3)}
+
+/* step animation states */
+.step{opacity:1;transition:opacity .35s}
+.viz[data-anim="on"] .step{opacity:.10}
+.viz[data-anim="on"] .step.shown{opacity:1}
+.step.dimmed{opacity:.12 !important}
+.step .arrow{stroke-dasharray:var(--len,400);stroke-dashoffset:0}
+.viz[data-anim="on"] .step .arrow{stroke-dashoffset:var(--len,400)}
+.viz[data-anim="on"] .step.shown .arrow{stroke-dashoffset:0;transition:stroke-dashoffset .5s ease}
+
+/* layer toggles */
+.hide-keys .layer-keys{display:none}
+.hide-spn .layer-spn{display:none}
+.hide-net .layer-net{display:none}
+.hide-err .layer-err{display:none}
+
+/* ============================ TABLE ============================ */
+.tbl{width:100%;border-collapse:collapse;font-size:14px;margin:14px 0;overflow:hidden;border-radius:12px;border:1px solid var(--line)}
+.tbl th,.tbl td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+.tbl th{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);background:var(--panel-2)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl td:first-child{font-weight:600;color:var(--ink)}
+.yes{color:var(--green);font-weight:600} .no{color:var(--red);font-weight:600} .mid{color:var(--gold);font-weight:600}
+
+/* ============================ STEP LIST ============================ */
+.steps{counter-reset:s;list-style:none;padding:0;margin:18px 0}
+.steps>li{counter-increment:s;position:relative;padding:16px 18px 16px 58px;border:1px solid var(--line);border-radius:12px;margin-bottom:12px;background:var(--panel)}
+.steps>li::before{content:counter(s,decimal-leading-zero);position:absolute;left:16px;top:16px;font-family:var(--mono);font-size:13px;color:var(--gold);font-weight:600;border:1px solid var(--gold-line);border-radius:7px;width:28px;height:28px;display:grid;place-items:center}
+.steps>li b{display:block;font-family:var(--display);font-size:16px;margin-bottom:3px}
+
+/* ============================ FAB / TOPBAR ============================ */
+.fabs{position:fixed;top:18px;right:22px;display:flex;gap:9px;z-index:50}
+.fab{font-family:var(--mono);font-size:12.5px;cursor:pointer;border:1px solid var(--line-2);background:var(--panel);color:var(--ink);border-radius:9px;padding:8px 13px;display:inline-flex;gap:7px;align-items:center;box-shadow:var(--shadow);transition:.15s}
+.fab:hover{border-color:var(--gold-line);color:var(--gold)}
+.menu-toggle{display:none}
+
+/* legend */
+.legend{display:flex;flex-wrap:wrap;gap:16px;font-family:var(--mono);font-size:11.5px;color:var(--ink-2);padding:10px 16px;border-top:1px solid var(--line);background:var(--bg-2)}
+.legend span{display:flex;gap:6px;align-items:center}
+.legend i{width:18px;height:3px;border-radius:2px;display:inline-block}
+
+/* ============================ RESPONSIVE ============================ */
+@media(max-width:980px){
+  :root{--nav-w:0px}
+  nav.side{position:fixed;z-index:60;left:0;top:0;transform:translateX(-100%);transition:.25s;width:280px;flex-basis:280px;box-shadow:var(--shadow)}
+  nav.side.open{transform:translateX(0)}
+  main{padding:70px 22px 100px}
+  .menu-toggle{display:inline-flex}
+}
+@media(max-width:560px){
+  main{padding:70px 15px 90px}
+  h1{font-size:30px}
+  .fab span.t{display:none}
+}
+
+/* ============================ PRINT / PDF ============================ */
+@media print{
+  :root{--bg:#fff;--panel:#fff;--panel-2:#f4f4f4;--ink:#111;--ink-2:#333;--ink-3:#666;--line:#ccc;--line-2:#bbb}
+  body{background:#fff}
+  nav.side,.fabs,.viz-bar .btn,.controls{display:none !important}
+  main{max-width:100%;padding:0}
+  section{break-inside:avoid;border-top:1px solid #ccc}
+  .viz,.card,.steps>li{break-inside:avoid;box-shadow:none}
+  .step{opacity:1 !important}
+  .step .arrow{stroke-dashoffset:0 !important}
+  .layer-keys,.layer-spn,.layer-net,.layer-err{display:initial !important}
+  .viz svg{min-width:0}
+  a{color:#111;text-decoration:none}
+}
+</style>
+</head>
+<body>
+<div class="fabs">
+  <button class="fab menu-toggle" onclick="document.querySelector('nav.side').classList.toggle('open')">☰ <span class="t">Menu</span></button>
+  <button class="fab" id="themeBtn" onclick="toggleTheme()">◑ <span class="t">Thème</span></button>
+  <button class="fab" onclick="window.print()">⤓ <span class="t">Export PDF</span></button>
+</div>
+
+<div class="shell">
+<!-- ================= SIDEBAR ================= -->
+<nav class="side" id="nav">
+  <div class="brand">
+    <span class="dot"></span>
+    <div><b>AUTH · RDP/F5</b><small>Kerberos × NTLMv2</small></div>
+  </div>
+  <div class="navgroup">Contexte</div>
+  <a href="#ctx"><span class="n">01</span> Topologie & problème</a>
+  <a href="#kerb"><span class="n">02</span> Kerberos — le flux</a>
+  <a href="#ntlm"><span class="n">03</span> NTLMv2 — le flux</a>
+  <a href="#break"><span class="n">04</span> Pourquoi le L4 casse</a>
+  <a href="#credssp"><span class="n">05</span> CredSSP / NLA</a>
+  <div class="navgroup">Vue d'ensemble</div>
+  <a href="#chain"><span class="n">Σ</span> Chaîne RDP complète</a>
+  <div class="navgroup">Solutions</div>
+  <a href="#opt1"><span class="n">06</span> Option 1 — Repli NTLMv2 ★</a>
+  <a href="#tests"><span class="n">6b</span> Tests NTLM · Win11 25H2 ★</a>
+  <a href="#opt2"><span class="n">07</span> Option 2 — SPN service</a>
+  <a href="#opt3"><span class="n">08</span> Option 3 — F5 APM / Broker</a>
+  <div class="navgroup">Synthèse</div>
+  <a href="#compare"><span class="n">09</span> Comparatif</a>
+  <a href="#reco"><span class="n">10</span> Reco & checklist</a>
+</nav>
+
+<!-- ================= MAIN ================= -->
+<main>
+  <header class="hero">
+    <div class="kicker">Note d'architecture · Authentification distante</div>
+    <h1>RDP à travers une VIP&nbsp;F5 en relais&nbsp;TCP</h1>
+    <p class="lede">Comment Kerberos et NTLMv2 se comportent quand une session RDP traverse un répartiteur F5 de niveau&nbsp;4, pourquoi CredSSP échoue, et les trois manières de le faire fonctionner — avec un focus sur le repli NTLMv2 propre.</p>
+    <div class="machines">
+      <span class="chip c1"><i></i><b>MachineClient.zcam.ztech</b><span>· client RDP · Win11 25H2</span></span>
+      <span class="chip c2"><i></i><b>VIp-coop.zres.ztech</b><span>· VIP F5, relais TCP L4</span></span>
+      <span class="chip c3"><i></i><b>MachineDestination.zcam.ztech</b><span>· hôte cible du pool</span></span>
+    </div>
+  </header>
+
+  <!-- ============ 01 CONTEXTE ============ -->
+  <section id="ctx">
+    <h2><span class="tag">01</span> Topologie & problème</h2>
+    <p>L'utilisateur ouvre une session <strong>RDP</strong> depuis <strong>MachineClient</strong> vers le nom <code>VIp-coop</code>, qui est une <strong>VIP F5 en mode relais TCP (niveau&nbsp;4)</strong>. La VIP ne fait que transférer les octets vers l'un des hôtes du pool, ici <strong>MachineDestination</strong>. Elle ne termine pas la session, ne parle pas le protocole RDP et ne porte aucun SPN.</p>
+
+    <div class="viz">
+      <div class="viz-bar"><span class="ttl">Topologie · chemin réseau</span></div>
+      <div class="viz-body">
+        <svg viewBox="0 0 1000 230" role="img" aria-label="Topologie réseau">
+          <defs>
+            <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="var(--ink-2)"/></marker>
+          </defs>
+          <!-- KDC top -->
+          <g>
+            <rect x="410" y="14" width="180" height="52" rx="10" class="actorbox"/>
+            <text x="500" y="38" text-anchor="middle" class="actorlabel">KDC · Active Directory</text>
+            <text x="500" y="54" text-anchor="middle" class="actorsub">émet TGT &amp; tickets</text>
+          </g>
+          <!-- client -->
+          <g>
+            <rect x="40" y="120" width="190" height="64" rx="12" class="actorbox" stroke="var(--cyan)"/>
+            <text x="135" y="148" text-anchor="middle" class="actorlabel">MachineClient</text>
+            <text x="135" y="166" text-anchor="middle" class="actorsub">mstsc → VIp-coop</text>
+          </g>
+          <!-- F5 -->
+          <g>
+            <rect x="405" y="120" width="190" height="64" rx="12" class="actorbox" stroke="var(--gold)"/>
+            <text x="500" y="144" text-anchor="middle" class="actorlabel">VIp-coop (F5)</text>
+            <text x="500" y="161" text-anchor="middle" class="actorsub">relais TCP · L4</text>
+            <text x="500" y="176" text-anchor="middle" class="actorsub" fill="var(--red)">aucun SPN</text>
+          </g>
+          <!-- dest -->
+          <g>
+            <rect x="770" y="120" width="190" height="64" rx="12" class="actorbox" stroke="var(--violet)"/>
+            <text x="865" y="148" text-anchor="middle" class="actorlabel">MachineDestination</text>
+            <text x="865" y="166" text-anchor="middle" class="actorsub">hôte du pool · TermService</text>
+          </g>
+          <!-- arrows -->
+          <line x1="232" y1="152" x2="400" y2="152" class="arrow" marker-end="url(#ah)"/>
+          <text x="316" y="142" text-anchor="middle" class="annot">TCP 3389</text>
+          <line x1="597" y1="152" x2="765" y2="152" class="arrow" marker-end="url(#ah)" stroke-dasharray="4 4"/>
+          <text x="681" y="142" text-anchor="middle" class="annot">forward brut</text>
+          <line x1="135" y1="118" x2="430" y2="68" class="arrow gold" marker-end="url(#ah)"/>
+          <text x="250" y="92" text-anchor="middle" class="annot" fill="var(--gold)">demande de ticket</text>
+        </svg>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--cyan)"></i>Initiateur</span>
+        <span><i style="background:var(--gold)"></i>Relais L4 (pas de terminaison)</span>
+        <span><i style="background:var(--violet)"></i>Cible réelle</span>
+        <span><i style="background:var(--red)"></i>Pas de SPN → point de friction</span>
+      </div>
+    </div>
+
+    <div class="note warn">
+      <span class="lab">Symptôme observé</span>
+      <p>Erreur CredSSP à la connexion : « l'identité de l'ordinateur distant ne peut pas être vérifiée » et/ou bascule/échec NTLMv2. La racine du problème : <strong>le nom auquel le client se connecte (VIp-coop) n'est pas le nom de la machine qui termine réellement la session (MachineDestination)</strong>.</p>
+    </div>
+
+    <div class="note">
+      <span class="lab">Détail de nommage — important</span>
+      <p>La VIP vit dans une <strong>zone DNS différente</strong> des machines : <code>VIp-coop.zres.ztech</code> contre <code>*.zcam.ztech</code> pour le client et la cible. Conséquence concrète : partout où on liste un « nom de serveur » pour NTLM (exceptions Restrict NTLM, SAN du certificat), c'est bien <code>VIp-coop.zres.ztech</code> — le nom <em>de connexion</em> — qu'il faut viser, pas le nom de MachineDestination.</p>
+    </div>
+  </section>
+
+  <!-- ============ 02 KERBEROS ============ -->
+  <section id="kerb">
+    <h2><span class="tag">02</span> Kerberos — le flux, étape par étape</h2>
+    <p>Kerberos lie chaque ticket à un <strong>SPN</strong> (Service Principal Name) et chiffre ce ticket avec la <strong>clé secrète du compte qui porte ce SPN</strong>. C'est exactement ce lien nom↔clé qui rend Kerberos incompatible avec un relais L4. Lance l'animation et active les couches pour voir où ça casse.</p>
+
+    <div class="viz" id="vizKerb" data-anim="off">
+      <div class="viz-bar">
+        <span class="ttl">Diagramme de séquence · Kerberos RDP</span>
+        <button class="btn primary" data-play="vizKerb">▶ Animer</button>
+        <button class="btn" data-reset="vizKerb">↺ Réinitialiser</button>
+      </div>
+      <div class="viz-body">
+        <svg viewBox="0 0 1000 580" role="img" aria-label="Séquence Kerberos">
+          <defs>
+            <marker id="kg" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="var(--gold)"/></marker>
+            <marker id="kr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="var(--red)"/></marker>
+          </defs>
+          <!-- actors -->
+          <g>
+            <rect x="55" y="8" width="150" height="44" rx="9" class="actorbox" stroke="var(--cyan)"/>
+            <text x="130" y="30" text-anchor="middle" class="actorlabel">MachineClient</text>
+            <text x="130" y="45" text-anchor="middle" class="actorsub">SSPI / mstsc</text>
+            <line x1="130" y1="52" x2="130" y2="560" class="lifeline"/>
+          </g>
+          <g>
+            <rect x="332" y="8" width="136" height="44" rx="9" class="actorbox"/>
+            <text x="400" y="30" text-anchor="middle" class="actorlabel">KDC (AD)</text>
+            <text x="400" y="45" text-anchor="middle" class="actorsub">AS / TGS</text>
+            <line x1="400" y1="52" x2="400" y2="560" class="lifeline"/>
+          </g>
+          <g>
+            <rect x="588" y="8" width="144" height="44" rx="9" class="actorbox" stroke="var(--gold)"/>
+            <text x="660" y="30" text-anchor="middle" class="actorlabel">VIp-coop</text>
+            <text x="660" y="45" text-anchor="middle" class="actorsub">F5 · relais L4</text>
+            <line x1="660" y1="52" x2="660" y2="560" class="lifeline"/>
+          </g>
+          <g>
+            <rect x="808" y="8" width="160" height="44" rx="9" class="actorbox" stroke="var(--violet)"/>
+            <text x="888" y="27" text-anchor="middle" class="actorlabel" font-size="12">MachineDestination</text>
+            <text x="888" y="44" text-anchor="middle" class="actorsub">TermService</text>
+            <line x1="888" y1="52" x2="888" y2="560" class="lifeline"/>
+          </g>
+
+          <!-- STEP 1 AS-REQ -->
+          <g class="step" data-step="1" data-phase="as">
+            <text x="265" y="92" text-anchor="middle" class="msg">AS-REQ (pré-authentification)</text>
+            <line x1="130" y1="100" x2="400" y2="100" class="arrow gold" marker-end="url(#kg)" style="--len:280"/>
+            <text x="118" y="96" text-anchor="end" class="msgnum">1</text>
+          </g>
+          <!-- STEP 2 AS-REP -->
+          <g class="step" data-step="2" data-phase="as">
+            <text x="265" y="132" text-anchor="middle" class="msg">AS-REP · délivre le TGT</text>
+            <line x1="400" y1="140" x2="130" y2="140" class="arrow gold" marker-end="url(#kg)" style="--len:280"/>
+            <text x="412" y="136" text-anchor="start" class="msgnum">2</text>
+            <g class="layer-keys"><text x="265" y="158" text-anchor="middle" class="annot" fill="var(--gold)">⚿ TGT chiffré avec la clé du compte krbtgt</text></g>
+          </g>
+          <!-- STEP 3 TGS-REQ -->
+          <g class="step" data-step="3" data-phase="tgs">
+            <text x="265" y="200" text-anchor="middle" class="msg">TGS-REQ → SPN « TERMSRV/VIp-coop »</text>
+            <line x1="130" y1="208" x2="400" y2="208" class="arrow gold" marker-end="url(#kg)" style="--len:280"/>
+            <text x="118" y="204" text-anchor="end" class="msgnum">3</text>
+            <g class="layer-spn"><text x="400" y="228" text-anchor="middle" class="annot">⌕ recherche du SPN dans l'AD</text></g>
+          </g>
+          <!-- STEP 4 TGS-REP -->
+          <g class="step" data-step="4" data-phase="tgs">
+            <text x="265" y="262" text-anchor="middle" class="msg">TGS-REP · ticket de service</text>
+            <line x1="400" y1="270" x2="130" y2="270" class="arrow gold" marker-end="url(#kg)" style="--len:280"/>
+            <text x="412" y="266" text-anchor="start" class="msgnum">4</text>
+            <g class="layer-keys"><text x="265" y="288" text-anchor="middle" class="annot" fill="var(--gold)">⚿ chiffré avec la clé du compte porteur du SPN</text></g>
+            <g class="layer-err">
+              <rect x="470" y="246" width="500" height="40" rx="8" fill="var(--red-soft)" stroke="var(--red)"/>
+              <text x="485" y="263" class="annot" fill="var(--red)" font-size="10">Branche A — si AUCUN compte ne porte le SPN :</text>
+              <text x="485" y="278" class="annot" fill="var(--red)" font-size="10">KRB5KDC_ERR_S_PRINCIPAL_UNKNOWN → SSPI bascule en NTLM</text>
+            </g>
+          </g>
+          <!-- STEP 5 AP-REQ to VIP -->
+          <g class="step" data-step="5" data-phase="ap">
+            <text x="395" y="332" text-anchor="middle" class="msg">AP-REQ + ticket de service (pour VIp-coop)</text>
+            <line x1="130" y1="340" x2="660" y2="340" class="arrow gold" marker-end="url(#kg)" style="--len:540"/>
+            <text x="118" y="336" text-anchor="end" class="msgnum">5</text>
+          </g>
+          <!-- STEP 6 L4 forward -->
+          <g class="step layer-net" data-step="6" data-phase="ap">
+            <text x="774" y="372" text-anchor="middle" class="msg">forward TCP brut (L4)</text>
+            <line x1="660" y1="380" x2="888" y2="380" class="arrow gold" marker-end="url(#kg)" stroke-dasharray="4 4" style="--len:240"/>
+            <text x="648" y="376" text-anchor="end" class="msgnum">6</text>
+          </g>
+          <!-- STEP 7 decrypt fail -->
+          <g class="step" data-step="7" data-phase="ap">
+            <rect x="788" y="404" width="200" height="58" rx="8" fill="var(--red-soft)" stroke="var(--red)"/>
+            <text x="888" y="424" text-anchor="middle" class="annot" fill="var(--red)" font-size="10">tente de déchiffrer avec SA</text>
+            <text x="888" y="438" text-anchor="middle" class="annot" fill="var(--red)" font-size="10">propre clé machine</text>
+            <text x="888" y="454" text-anchor="middle" class="annot" fill="var(--red)" font-size="10" font-weight="600">✗ clé incompatible</text>
+            <text x="888" y="398" text-anchor="middle" class="msgnum">7</text>
+            <g class="layer-err"><text x="540" y="430" text-anchor="middle" class="annot" fill="var(--red)">KRB_AP_ERR_MODIFIED — le ticket était destiné à VIp-coop</text></g>
+          </g>
+          <!-- STEP 8 fail back -->
+          <g class="step" data-step="8" data-phase="ap">
+            <text x="509" y="498" text-anchor="middle" class="msg" fill="var(--red)">échec de l'authentification Kerberos</text>
+            <line x1="888" y1="506" x2="130" y2="506" class="arrow red" marker-end="url(#kr)" style="--len:770"/>
+            <text x="900" y="502" text-anchor="start" class="msgnum">8</text>
+          </g>
+        </svg>
+      </div>
+      <div class="controls">
+        <div class="ctl-block">
+          <span class="h">Focus par phase</span>
+          <div class="pills" data-phasefor="vizKerb">
+            <span class="pill on" data-phase="all">Tout</span>
+            <span class="pill" data-phase="as">① AS — TGT</span>
+            <span class="pill" data-phase="tgs">② TGS — ticket</span>
+            <span class="pill" data-phase="ap">③ AP — présentation</span>
+          </div>
+        </div>
+        <div class="ctl-block">
+          <span class="h">Couches activables</span>
+          <div class="pills">
+            <label class="lyr"><input type="checkbox" checked data-layer="keys" data-for="vizKerb"> Clés de chiffrement</label>
+            <label class="lyr"><input type="checkbox" checked data-layer="spn" data-for="vizKerb"> Résolution SPN</label>
+            <label class="lyr"><input type="checkbox" checked data-layer="net" data-for="vizKerb"> Chemin L4 F5</label>
+            <label class="lyr"><input type="checkbox" checked data-layer="err" data-for="vizKerb"> Annotations d'erreur</label>
+          </div>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--gold)"></i>Échange Kerberos</span>
+        <span><i style="background:var(--red)"></i>Échec</span>
+        <span style="color:var(--ink-3)">⚿ = clé de chiffrement du ticket</span>
+      </div>
+    </div>
+
+    <div class="note">
+      <span class="lab">Le point clé</span>
+      <p>À l'étape 5, MachineClient demande et présente un ticket pour <code>TERMSRV/VIp-coop</code>. Ce ticket n'est déchiffrable que par le détenteur de la clé associée à ce SPN. <strong>MachineDestination n'a que sa propre clé machine</strong> → elle ne peut pas le lire. Le relais L4 ne « traduit » rien : il transporte un secret destiné à quelqu'un d'autre.</p>
+    </div>
+  </section>
+
+  <!-- ============ 03 NTLMv2 ============ -->
+  <section id="ntlm">
+    <h2><span class="tag">03</span> NTLMv2 — le flux, étape par étape</h2>
+    <p>NTLMv2 ne lie rien à un SPN ni au nom de connexion. Il authentifie l'utilisateur par un défi/réponse <strong>contre l'hôte qui termine réellement la connexion TCP</strong>. C'est précisément pour ça qu'il survit à un relais L4 là où Kerberos échoue.</p>
+
+    <div class="viz" id="vizNtlm" data-anim="off">
+      <div class="viz-bar">
+        <span class="ttl">Diagramme de séquence · NTLMv2</span>
+        <button class="btn primary" data-play="vizNtlm">▶ Animer</button>
+        <button class="btn" data-reset="vizNtlm">↺ Réinitialiser</button>
+      </div>
+      <div class="viz-body">
+        <svg viewBox="0 0 1000 470" role="img" aria-label="Séquence NTLMv2">
+          <defs>
+            <marker id="ncy" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="var(--cyan)"/></marker>
+            <marker id="ngr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="var(--green)"/></marker>
+          </defs>
+          <g>
+            <rect x="45" y="8" width="150" height="44" rx="9" class="actorbox" stroke="var(--cyan)"/>
+            <text x="120" y="30" text-anchor="middle" class="actorlabel">MachineClient</text>
+            <text x="120" y="45" text-anchor="middle" class="actorsub">SSPI</text>
+            <line x1="120" y1="52" x2="120" y2="448" class="lifeline"/>
+          </g>
+          <g>
+            <rect x="312" y="8" width="136" height="44" rx="9" class="actorbox" stroke="var(--gold)"/>
+            <text x="380" y="30" text-anchor="middle" class="actorlabel">VIp-coop</text>
+            <text x="380" y="45" text-anchor="middle" class="actorsub">F5 · L4</text>
+            <line x1="380" y1="52" x2="380" y2="448" class="lifeline"/>
+          </g>
+          <g>
+            <rect x="540" y="8" width="160" height="44" rx="9" class="actorbox" stroke="var(--violet)"/>
+            <text x="620" y="27" text-anchor="middle" class="actorlabel" font-size="12">MachineDestination</text>
+            <text x="620" y="44" text-anchor="middle" class="actorsub">termine la session</text>
+            <line x1="620" y1="52" x2="620" y2="448" class="lifeline"/>
+          </g>
+          <g>
+            <rect x="800" y="8" width="150" height="44" rx="9" class="actorbox"/>
+            <text x="875" y="30" text-anchor="middle" class="actorlabel">Contrôleur AD</text>
+            <text x="875" y="45" text-anchor="middle" class="actorsub">Netlogon</text>
+            <line x1="875" y1="52" x2="875" y2="448" class="lifeline"/>
+          </g>
+
+          <!-- F transit annotation -->
+          <g class="step layer-net" data-step="0" data-phase="hs">
+            <text x="380" y="78" text-anchor="middle" class="annot" fill="var(--gold)">transit L4 — n'inspecte rien</text>
+          </g>
+
+          <!-- 1 NEGOTIATE -->
+          <g class="step" data-step="1" data-phase="hs">
+            <text x="370" y="100" text-anchor="middle" class="msg">NEGOTIATE_MESSAGE</text>
+            <line x1="120" y1="108" x2="620" y2="108" class="arrow cyan" marker-end="url(#ncy)" style="--len:510"/>
+            <text x="108" y="104" text-anchor="end" class="msgnum">1</text>
+          </g>
+          <!-- 2 CHALLENGE -->
+          <g class="step" data-step="2" data-phase="hs">
+            <text x="370" y="140" text-anchor="middle" class="msg">CHALLENGE_MESSAGE</text>
+            <line x1="620" y1="148" x2="120" y2="148" class="arrow cyan" marker-end="url(#ncy)" style="--len:510"/>
+            <text x="632" y="144" text-anchor="start" class="msgnum">2</text>
+            <g class="layer-keys"><text x="370" y="166" text-anchor="middle" class="annot" fill="var(--cyan)">⚿ contient un nonce serveur (challenge)</text></g>
+          </g>
+          <!-- 3 AUTHENTICATE -->
+          <g class="step" data-step="3" data-phase="hs">
+            <text x="370" y="206" text-anchor="middle" class="msg">AUTHENTICATE_MESSAGE</text>
+            <line x1="120" y1="214" x2="620" y2="214" class="arrow cyan" marker-end="url(#ncy)" style="--len:510"/>
+            <text x="108" y="210" text-anchor="end" class="msgnum">3</text>
+            <g class="layer-keys"><text x="370" y="232" text-anchor="middle" class="annot" fill="var(--cyan)">⚿ réponse = HMAC-MD5(NTOWFv2, nonce + blob)</text></g>
+          </g>
+          <!-- 4 validate -->
+          <g class="step layer-net" data-step="4" data-phase="val">
+            <text x="747" y="270" text-anchor="middle" class="msg">pass-through (canal sécurisé)</text>
+            <line x1="620" y1="278" x2="875" y2="278" class="arrow" marker-end="url(#ah)" style="--len:265"/>
+            <text x="608" y="274" text-anchor="end" class="msgnum">4</text>
+          </g>
+          <!-- 5 ok -->
+          <g class="step layer-net" data-step="5" data-phase="val">
+            <text x="747" y="310" text-anchor="middle" class="msg">validation OK + clé de session</text>
+            <line x1="875" y1="318" x2="620" y2="318" class="arrow" marker-end="url(#ah)" style="--len:265"/>
+            <text x="887" y="314" text-anchor="start" class="msgnum">5</text>
+          </g>
+          <!-- 6 grant -->
+          <g class="step" data-step="6" data-phase="ok">
+            <text x="370" y="368" text-anchor="middle" class="msg" fill="var(--green)">session ouverte — accès accordé</text>
+            <line x1="620" y1="376" x2="120" y2="376" class="arrow green" marker-end="url(#ngr)" style="--len:510"/>
+            <text x="632" y="372" text-anchor="start" class="msgnum">6</text>
+          </g>
+        </svg>
+      </div>
+      <div class="controls">
+        <div class="ctl-block">
+          <span class="h">Focus par phase</span>
+          <div class="pills" data-phasefor="vizNtlm">
+            <span class="pill on" data-phase="all">Tout</span>
+            <span class="pill" data-phase="hs">① Défi / réponse</span>
+            <span class="pill" data-phase="val">② Validation DC</span>
+            <span class="pill" data-phase="ok">③ Accès</span>
+          </div>
+        </div>
+        <div class="ctl-block">
+          <span class="h">Couches activables</span>
+          <div class="pills">
+            <label class="lyr"><input type="checkbox" checked data-layer="keys" data-for="vizNtlm"> Crypto défi/réponse</label>
+            <label class="lyr"><input type="checkbox" checked data-layer="net" data-for="vizNtlm"> Validation + transit L4</label>
+          </div>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--cyan)"></i>Échange NTLMv2</span>
+        <span><i style="background:var(--green)"></i>Accès accordé</span>
+        <span style="color:var(--ink-3)">⚿ = matériel cryptographique</span>
+      </div>
+    </div>
+
+    <div class="note ok">
+      <span class="lab">Pourquoi ça marche à travers le L4</span>
+      <p>Aucune étape n'exige que le nom de connexion (VIp-coop) corresponde à un SPN. Le défi est émis par <strong>MachineDestination</strong>, la réponse lui revient, et c'est elle qui valide via le canal Netlogon. La VIP n'est qu'un tuyau — son nom n'entre jamais dans le calcul cryptographique.</p>
+    </div>
+  </section>
+
+  <!-- ============ 04 POURQUOI CASSE ============ -->
+  <section id="break">
+    <h2><span class="tag">04</span> Pourquoi un relais L4 casse Kerberos</h2>
+    <p>Le tableau résume l'opposition fondamentale entre les deux protocoles dans ce montage précis.</p>
+    <table class="tbl">
+      <thead><tr><th>Dimension</th><th>Kerberos</th><th>NTLMv2</th></tr></thead>
+      <tbody>
+        <tr><td>Lien au nom</td><td>Ticket lié au <strong>SPN du nom de connexion</strong> (VIp-coop)</td><td>Aucun lien au nom — lié à l'<strong>hôte terminal</strong></td></tr>
+        <tr><td>Clé de déchiffrement</td><td>Clé du compte porteur du SPN <span class="no">≠ clé de MachineDestination</span></td><td>Pas de ticket à déchiffrer côté nom</td></tr>
+        <tr><td>Compatible relais L4</td><td class="no">Non — le ticket arrive au mauvais détenteur</td><td class="yes">Oui — transparent</td></tr>
+        <tr><td>Auth mutuelle</td><td class="yes">Oui (forte)</td><td class="mid">Limitée</td></tr>
+        <tr><td>Délégation / double-saut</td><td class="yes">Oui (KCD / RBCD)</td><td class="no">Non</td></tr>
+        <tr><td>Résultat dans ce montage</td><td class="no">KRB_AP_ERR_MODIFIED / S_PRINCIPAL_UNKNOWN</td><td class="yes">Authentification réussie</td></tr>
+      </tbody>
+    </table>
+    <div class="note warn">
+      <span class="lab">Conséquence directe</span>
+      <p>Tant que la VIP reste en L4, <strong>il n'existe aucune configuration de SPN qui rende Kerberos transparent pour RDP</strong>. Enregistrer <code>TERMSRV/VIp-coop</code> sur un compte ne fait qu'aiguiller le client vers un chemin Kerberos qui finira en erreur de déchiffrement côté backend. La seule manière de rester en L4 est d'assumer NTLMv2 (option 1) ou de quitter le L4 (option 3).</p>
+    </div>
+  </section>
+
+  <!-- ============ 05 CREDSSP ============ -->
+  <section id="credssp">
+    <h2><span class="tag">05</span> CredSSP / NLA — la couche qui déclenche l'erreur</h2>
+    <p>Avant même l'authentification utilisateur, RDP avec NLA exécute <strong>CredSSP</strong> : un tunnel TLS, puis une négociation SPNEGO (Kerberos ou NTLM), puis éventuellement la délégation des identifiants. L'erreur que tu observes vient le plus souvent de la <strong>première étape TLS</strong>.</p>
+
+    <div class="viz">
+      <div class="viz-bar"><span class="ttl">CredSSP · trois sous-étapes</span></div>
+      <div class="viz-body">
+        <svg viewBox="0 0 1000 200" role="img" aria-label="Étapes CredSSP">
+          <defs><marker id="cah" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="var(--ink-2)"/></marker></defs>
+          <g><rect x="30" y="60" width="280" height="92" rx="12" class="actorbox" stroke="var(--red)"/>
+            <text x="170" y="88" text-anchor="middle" class="actorlabel">① Handshake TLS</text>
+            <text x="170" y="110" text-anchor="middle" class="actorsub">MachineDestination présente</text>
+            <text x="170" y="126" text-anchor="middle" class="actorsub">son certificat</text>
+            <text x="170" y="144" text-anchor="middle" class="annot" fill="var(--red)">⚠ le SAN doit couvrir VIp-coop</text></g>
+          <g><rect x="360" y="60" width="280" height="92" rx="12" class="actorbox"/>
+            <text x="500" y="88" text-anchor="middle" class="actorlabel">② Négociation SPNEGO</text>
+            <text x="500" y="110" text-anchor="middle" class="actorsub">Kerberos (échoue ici)</text>
+            <text x="500" y="126" text-anchor="middle" class="actorsub">→ repli NTLMv2</text></g>
+          <g><rect x="690" y="60" width="280" height="92" rx="12" class="actorbox"/>
+            <text x="830" y="88" text-anchor="middle" class="actorlabel">③ Délégation creds</text>
+            <text x="830" y="110" text-anchor="middle" class="actorsub">TSRequest dans le tunnel</text>
+            <text x="830" y="126" text-anchor="middle" class="actorsub">(patch oracle remediation)</text></g>
+          <line x1="312" y1="106" x2="358" y2="106" class="arrow" marker-end="url(#cah)"/>
+          <line x1="642" y1="106" x2="688" y2="106" class="arrow" marker-end="url(#cah)"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-top:8px">
+      <div class="card">
+        <h3 style="margin-top:0">« L'identité ne peut pas être vérifiée »</h3>
+        <p>Étape ①. Le certificat présenté par MachineDestination ne contient pas <code>VIp-coop</code> dans son sujet/SAN, alors que c'est le nom auquel le client s'est connecté. <strong>C'est le blocage le plus courant ici</strong> — et il se règle par le certificat (option 1).</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">« La fonction demandée n'est pas prise en charge »</h3>
+        <p>Étape ③, problème <strong>distinct</strong> du SPN : il s'agit du correctif <em>CredSSP Encryption Oracle Remediation</em> (CVE-2018-0886). Désalignement de niveau de patch/GPO entre client et serveur. À traiter séparément si c'est ce message exact.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Σ CHAÎNE RDP COMPLÈTE ============ -->
+  <section id="chain">
+    <h2><span class="tag">Σ · Vue complète</span> Chaîne de connexion RDP — bout en bout</h2>
+    <p>Cette vue assemble <strong>toute la séquence</strong>, du premier paquet TCP jusqu'au bureau affiché : résolution DNS, relais L4 du F5, handshake TLS, <strong>NLA / CredSSP</strong>, la tentative <strong>Kerberos</strong> (qui échoue volontairement), le repli <strong>NTLMv2</strong>, la validation <strong>Netlogon</strong> auprès du DC, puis la délégation des identifiants. Les trois noms réels sont conservés : <code>MachineClient.zcam.ztech</code>, <code>VIp-coop.zres.ztech</code> et <code>MachineDestination.zcam.ztech</code>.</p>
+
+    <div class="note">
+      <span class="lab">Comment lire ce schéma</span>
+      <p>Chaque <strong>phase</strong> est marquée par une barre colorée à gauche (réseau, NLA, TLS, Kerberos, NTLMv2, Netlogon, session). La <strong>zone violette</strong> est le canal TLS de CredSSP : tout ce qui s'y trouve est chiffré et traverse le F5 sans inspection. Les flèches qui <strong>sortent à gauche vers le KDC</strong> sont le canal Kerberos parallèle (UDP/TCP 88), distinct du tunnel RDP. Deux points de friction structurent toute la chaîne : ① l'<strong>identité TLS</strong> (le SAN doit couvrir <code>VIp-coop.zres.ztech</code>) et ② l'<strong>échec propre de Kerberos</strong> (aucun SPN sur la VIP) qui déclenche le repli NTLMv2. Sers-toi de <em>« Animer »</em> pour dérouler les 21 étapes, des <em>filtres par phase</em> pour isoler un segment, et des <em>couches</em> pour montrer/masquer la crypto, la résolution SPN, le réseau L4 et les erreurs.</p>
+    </div>
+
+    <div class="viz" id="vizChain" data-anim="off">
+      <div class="viz-bar">
+        <span class="ttl">Diagramme de séquence · chaîne RDP complète à travers la VIP F5 (L4)</span>
+        <button class="btn primary" data-play="vizChain">▶ Animer</button>
+        <button class="btn" data-reset="vizChain">↺ Réinitialiser</button>
+      </div>
+      <div class="viz-body">
+        <svg viewBox="0 0 1040 1212" role="img" aria-label="Chaîne de connexion RDP complète, du TCP à la session, à travers une VIP F5 de niveau 4">
+          <defs>
+            <marker id="chg"  markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="var(--gold)"/></marker>
+            <marker id="chc"  markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="var(--cyan)"/></marker>
+            <marker id="chr"  markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="var(--red)"/></marker>
+            <marker id="chv"  markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="var(--violet)"/></marker>
+            <marker id="chn"  markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="var(--ink-2)"/></marker>
+            <marker id="chgr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="var(--green)"/></marker>
+          </defs>
+
+          <!-- ===== ZONE TLS / CREDSSP (envelope) ===== -->
+          <rect x="252" y="340" width="540" height="856" rx="14" fill="var(--violet)" fill-opacity="0.05" stroke="var(--violet)" stroke-opacity="0.45" stroke-dasharray="6 6"/>
+          <text x="784" y="356" text-anchor="end" style="font-family:var(--mono);font-size:10.5px;fill:var(--violet);opacity:.85">zone TLS · CredSSP (chiffré)</text>
+
+          <!-- ===== ACTORS + LIFELINES ===== -->
+          <g>
+            <rect x="20" y="8" width="150" height="50" rx="9" class="actorbox"/>
+            <text x="95" y="30" text-anchor="middle" class="actorlabel" font-size="12">Active Directory</text>
+            <text x="95" y="46" text-anchor="middle" class="actorsub">rôle KDC · AS/TGS · krbtgt</text>
+            <line x1="95" y1="58" x2="95" y2="1196" class="lifeline"/>
+          </g>
+          <g>
+            <rect x="215" y="8" width="170" height="50" rx="9" class="actorbox" stroke="var(--cyan)"/>
+            <text x="300" y="30" text-anchor="middle" class="actorlabel">MachineClient</text>
+            <text x="300" y="46" text-anchor="middle" class="actorsub">MachineClient.zcam.ztech</text>
+            <line x1="300" y1="58" x2="300" y2="1196" class="lifeline"/>
+          </g>
+          <g>
+            <rect x="430" y="8" width="180" height="50" rx="9" class="actorbox" stroke="var(--gold)"/>
+            <text x="520" y="30" text-anchor="middle" class="actorlabel">VIp-coop (F5)</text>
+            <text x="520" y="46" text-anchor="middle" class="actorsub" fill="var(--red)">VIp-coop.zres.ztech · L4 · aucun SPN</text>
+            <line x1="520" y1="58" x2="520" y2="1196" class="lifeline"/>
+          </g>
+          <g>
+            <rect x="650" y="8" width="180" height="50" rx="9" class="actorbox" stroke="var(--violet)"/>
+            <text x="740" y="30" text-anchor="middle" class="actorlabel">MachineDestination</text>
+            <text x="740" y="46" text-anchor="middle" class="actorsub">MachineDestination.zcam.ztech</text>
+            <line x1="740" y1="58" x2="740" y2="1196" class="lifeline"/>
+          </g>
+          <g>
+            <rect x="865" y="8" width="160" height="50" rx="9" class="actorbox"/>
+            <text x="945" y="30" text-anchor="middle" class="actorlabel" font-size="12">Active Directory</text>
+            <text x="945" y="46" text-anchor="middle" class="actorsub">rôle DC · Netlogon</text>
+            <line x1="945" y1="58" x2="945" y2="1196" class="lifeline"/>
+          </g>
+
+          <!-- ===================== BAND 1 · L4 ===================== -->
+          <line x1="14" y1="66" x2="1026" y2="66" stroke="var(--line)" stroke-dasharray="2 5"/>
+          <rect x="14" y="70" width="6" height="146" rx="3" fill="var(--cyan)"/>
+          <text x="30" y="84" style="font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.07em;fill:var(--cyan)">① RÉSEAU — relais TCP L4 (le tube)</text>
+
+          <g class="step layer-net" data-step="1" data-phase="l4">
+            <rect x="246" y="98" width="320" height="30" rx="7" fill="var(--panel-2)" stroke="var(--line-2)"/>
+            <text x="406" y="117" text-anchor="middle" class="annot">mstsc → VIp-coop.zres.ztech · DNS résout l'IP de la VIP</text>
+            <text x="236" y="116" text-anchor="end" class="msgnum">1</text>
+          </g>
+          <g class="step layer-net" data-step="2" data-phase="l4">
+            <text x="410" y="150" text-anchor="middle" class="msg">TCP SYN / SYN-ACK / ACK · port 3389</text>
+            <line x1="300" y1="158" x2="520" y2="158" class="arrow cyan" marker-end="url(#chc)" style="--len:220"/>
+            <text x="292" y="154" text-anchor="end" class="msgnum">2</text>
+          </g>
+          <g class="step layer-net" data-step="3" data-phase="l4">
+            <text x="630" y="182" text-anchor="middle" class="msg">forward TCP brut → backend :3389</text>
+            <line x1="520" y1="190" x2="740" y2="190" class="arrow" marker-end="url(#chn)" style="--len:220"/>
+            <text x="512" y="186" text-anchor="end" class="msgnum">3</text>
+            <text x="630" y="208" text-anchor="middle" class="annot" fill="var(--gold)">persistance source-addr · le F5 ne termine rien</text>
+          </g>
+
+          <!-- ===================== BAND 2 · NLA ===================== -->
+          <line x1="14" y1="224" x2="1026" y2="224" stroke="var(--line)" stroke-dasharray="2 5"/>
+          <rect x="14" y="228" width="6" height="100" rx="3" fill="var(--ink-3)"/>
+          <text x="30" y="242" style="font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.07em;fill:var(--ink-2)">② NLA — négociation X.224 (CredSSP exigé)</text>
+
+          <g class="step" data-step="4" data-phase="nla">
+            <text x="520" y="254" text-anchor="middle" class="msg">X.224 Connection Request — PROTOCOL_HYBRID (NLA)</text>
+            <line x1="300" y1="262" x2="740" y2="262" class="arrow" marker-end="url(#chn)" style="--len:440"/>
+            <text x="292" y="258" text-anchor="end" class="msgnum">4</text>
+          </g>
+          <g class="step" data-step="5" data-phase="nla">
+            <text x="520" y="292" text-anchor="middle" class="msg">X.224 Connection Confirm — HYBRID accepté</text>
+            <line x1="740" y1="300" x2="300" y2="300" class="arrow" marker-end="url(#chn)" style="--len:440"/>
+            <text x="748" y="296" text-anchor="start" class="msgnum">5</text>
+            <text x="520" y="318" text-anchor="middle" class="annot">→ CredSSP / NLA s'exécute avant tout bureau</text>
+          </g>
+
+          <!-- ===================== BAND 3 · TLS ===================== -->
+          <line x1="14" y1="336" x2="1026" y2="336" stroke="var(--line)" stroke-dasharray="2 5"/>
+          <rect x="14" y="340" width="6" height="160" rx="3" fill="var(--violet)"/>
+          <text x="30" y="354" style="font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.07em;fill:var(--violet)">③ CredSSP ① — handshake TLS + identité</text>
+
+          <g class="step" data-step="6" data-phase="tls">
+            <text x="520" y="370" text-anchor="middle" class="msg">TLS ClientHello</text>
+            <line x1="300" y1="378" x2="740" y2="378" class="arrow" style="stroke:var(--violet);--len:440" marker-end="url(#chv)"/>
+            <text x="292" y="374" text-anchor="end" class="msgnum">6</text>
+          </g>
+          <g class="step" data-step="7" data-phase="tls">
+            <text x="520" y="408" text-anchor="middle" class="msg">TLS ServerHello + Certificate (RDP)</text>
+            <line x1="740" y1="416" x2="300" y2="416" class="arrow" style="stroke:var(--violet);--len:440" marker-end="url(#chv)"/>
+            <text x="748" y="412" text-anchor="start" class="msgnum">7</text>
+            <text x="520" y="432" text-anchor="middle" class="annot" fill="var(--gold)">certificat de MachineDestination — or le client a demandé VIp-coop</text>
+            <g class="layer-err"><text x="520" y="448" text-anchor="middle" class="annot" fill="var(--red)">⚠ le SAN doit couvrir VIp-coop.zres.ztech, sinon « identité non vérifiée »</text></g>
+          </g>
+          <g class="step" data-step="8" data-phase="tls">
+            <rect x="290" y="466" width="460" height="26" rx="8" fill="var(--green-soft)" stroke="var(--green)"/>
+            <text x="520" y="483" text-anchor="middle" class="annot" fill="var(--green)">✓ SAN = VIp-coop.zres.ztech + EKU Remote Desktop Auth → identité OK · tunnel TLS établi</text>
+            <text x="280" y="482" text-anchor="end" class="msgnum">8</text>
+          </g>
+
+          <!-- ===================== BAND 4 · KERBEROS ===================== -->
+          <line x1="14" y1="510" x2="1026" y2="510" stroke="var(--line)" stroke-dasharray="2 5"/>
+          <rect x="14" y="514" width="6" height="240" rx="3" fill="var(--gold)"/>
+          <text x="30" y="528" style="font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.07em;fill:var(--gold)">④ CredSSP ② — SPNEGO tente Kerberos (échec attendu)</text>
+
+          <g class="step" data-step="9" data-phase="kerb">
+            <rect x="300" y="548" width="300" height="26" rx="7" fill="var(--panel-2)" stroke="var(--gold-line)"/>
+            <text x="450" y="565" text-anchor="middle" class="annot" fill="var(--gold)">SPNEGO : le client propose Kerberos en premier</text>
+            <text x="290" y="564" text-anchor="end" class="msgnum">9</text>
+          </g>
+          <g class="step" data-step="10" data-phase="kerb">
+            <text x="197" y="588" text-anchor="middle" class="msg" font-size="11">AS-REQ / AS-REP → TGT</text>
+            <line x1="300" y1="596" x2="95" y2="596" class="arrow gold" marker-end="url(#chg)" style="--len:205"/>
+            <text x="312" y="592" text-anchor="start" class="msgnum">10</text>
+            <g class="layer-keys"><text x="197" y="612" text-anchor="middle" class="annot" fill="var(--gold)">⚿ TGT chiffré avec la clé du compte krbtgt</text></g>
+          </g>
+          <g class="step" data-step="11" data-phase="kerb">
+            <text x="197" y="632" text-anchor="middle" class="msg" font-size="11">TGS-REQ → TERMSRV/VIp-coop</text>
+            <line x1="300" y1="640" x2="95" y2="640" class="arrow gold" marker-end="url(#chg)" style="--len:205"/>
+            <text x="312" y="636" text-anchor="start" class="msgnum">11</text>
+            <g class="layer-spn"><text x="197" y="656" text-anchor="middle" class="annot">⌕ recherche du SPN dans l'AD</text></g>
+          </g>
+          <g class="step" data-step="12" data-phase="kerb">
+            <text x="197" y="676" text-anchor="middle" class="msg" fill="var(--red)" font-size="11">KRB5KDC_ERR_S_PRINCIPAL_UNKNOWN</text>
+            <line x1="95" y1="684" x2="300" y2="684" class="arrow red" marker-end="url(#chr)" style="--len:205"/>
+            <text x="82" y="680" text-anchor="end" class="msgnum">12</text>
+            <g class="layer-err">
+              <rect x="312" y="692" width="430" height="22" rx="6" fill="var(--red-soft)" stroke="var(--red)"/>
+              <text x="527" y="707" text-anchor="middle" class="annot" fill="var(--red)" font-size="10">aucun compte ne porte TERMSRV/VIp-coop — c'est volontaire (pas de SPN sur la VIP)</text>
+            </g>
+          </g>
+          <g class="step" data-step="13" data-phase="kerb">
+            <rect x="300" y="722" width="440" height="26" rx="7" fill="var(--gold-soft)" stroke="var(--gold-line)"/>
+            <text x="520" y="739" text-anchor="middle" class="annot" fill="var(--gold)">↓ SSPI bascule proprement en NTLMv2 — le nom VIp-coop sort du calcul</text>
+            <text x="290" y="738" text-anchor="end" class="msgnum">13</text>
+          </g>
+
+          <!-- ===================== BAND 5 · NTLMv2 ===================== -->
+          <line x1="14" y1="764" x2="1026" y2="764" stroke="var(--line)" stroke-dasharray="2 5"/>
+          <rect x="14" y="768" width="6" height="148" rx="3" fill="var(--cyan)"/>
+          <text x="30" y="782" style="font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.07em;fill:var(--cyan)">⑤ Repli NTLMv2 — à travers le L4 (dans le tunnel TLS)</text>
+
+          <g class="step" data-step="14" data-phase="ntlm">
+            <text x="520" y="798" text-anchor="middle" class="msg">NEGOTIATE_MESSAGE (Type 1) · traverse le F5 sans inspection</text>
+            <line x1="300" y1="806" x2="740" y2="806" class="arrow cyan" marker-end="url(#chc)" style="--len:440"/>
+            <text x="292" y="802" text-anchor="end" class="msgnum">14</text>
+          </g>
+          <g class="step" data-step="15" data-phase="ntlm">
+            <text x="520" y="836" text-anchor="middle" class="msg">CHALLENGE_MESSAGE (Type 2) — défi serveur (nonce)</text>
+            <line x1="740" y1="844" x2="300" y2="844" class="arrow cyan" marker-end="url(#chc)" style="--len:440"/>
+            <text x="748" y="840" text-anchor="start" class="msgnum">15</text>
+            <text x="520" y="860" text-anchor="middle" class="annot" fill="var(--gold)">le défi vient de l'hôte TERMINAL, jamais de la VIP</text>
+          </g>
+          <g class="step" data-step="16" data-phase="ntlm">
+            <text x="520" y="880" text-anchor="middle" class="msg">AUTHENTICATE_MESSAGE (Type 3)</text>
+            <line x1="300" y1="888" x2="740" y2="888" class="arrow cyan" marker-end="url(#chc)" style="--len:440"/>
+            <text x="292" y="884" text-anchor="end" class="msgnum">16</text>
+            <g class="layer-keys"><text x="520" y="904" text-anchor="middle" class="annot" fill="var(--cyan)">⚿ réponse = HMAC-MD5(NTOWFv2, défi + blob)</text></g>
+          </g>
+
+          <!-- ===================== BAND 6 · NETLOGON ===================== -->
+          <line x1="14" y1="924" x2="1026" y2="924" stroke="var(--line)" stroke-dasharray="2 5"/>
+          <rect x="14" y="928" width="6" height="104" rx="3" fill="var(--ink-3)"/>
+          <text x="30" y="942" style="font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.07em;fill:var(--ink-2)">⑥ Validation Netlogon (canal sécurisé → DC)</text>
+
+          <g class="step layer-net" data-step="17" data-phase="val">
+            <text x="842" y="958" text-anchor="middle" class="msg" font-size="11">NETLOGON_NETWORK_INFO · pass-through</text>
+            <line x1="740" y1="966" x2="945" y2="966" class="arrow" marker-end="url(#chn)" style="--len:205"/>
+            <text x="732" y="962" text-anchor="end" class="msgnum">17</text>
+          </g>
+          <g class="step" data-step="18" data-phase="val">
+            <text x="842" y="996" text-anchor="middle" class="msg" font-size="11">validation OK + clé de session</text>
+            <line x1="945" y1="1004" x2="740" y2="1004" class="arrow green" marker-end="url(#chgr)" style="--len:205"/>
+            <text x="933" y="1000" text-anchor="end" class="msgnum">18</text>
+            <g class="layer-keys"><text x="842" y="1020" text-anchor="middle" class="annot" fill="var(--green)">✓ identité utilisateur prouvée</text></g>
+          </g>
+
+          <!-- ===================== BAND 7 · SESSION ===================== -->
+          <line x1="14" y1="1040" x2="1026" y2="1040" stroke="var(--line)" stroke-dasharray="2 5"/>
+          <rect x="14" y="1044" width="6" height="152" rx="3" fill="var(--green)"/>
+          <text x="30" y="1058" style="font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.07em;fill:var(--green)">⑦ CredSSP ③ — délégation des identifiants + session RDP</text>
+
+          <g class="step" data-step="19" data-phase="sess">
+            <text x="520" y="1074" text-anchor="middle" class="msg">CredSSP : pubKeyAuth — protection anti-oracle (CVE-2018-0886)</text>
+            <line x1="300" y1="1082" x2="740" y2="1082" class="arrow" marker-end="url(#chn)" style="--len:440"/>
+            <text x="292" y="1078" text-anchor="end" class="msgnum">19</text>
+            <g class="layer-err"><text x="520" y="1098" text-anchor="middle" class="annot" fill="var(--red)">désalignement de patch ⇒ « fonction non prise en charge » (problème distinct)</text></g>
+          </g>
+          <g class="step" data-step="20" data-phase="sess">
+            <text x="520" y="1118" text-anchor="middle" class="msg">TSRequest — délégation des identifiants (chiffrée dans le tunnel)</text>
+            <line x1="300" y1="1126" x2="740" y2="1126" class="arrow" marker-end="url(#chn)" style="--len:440"/>
+            <text x="292" y="1122" text-anchor="end" class="msgnum">20</text>
+          </g>
+          <g class="step" data-step="21" data-phase="sess">
+            <text x="520" y="1152" text-anchor="middle" class="msg" fill="var(--green)">SESSION RDP OUVERTE</text>
+            <line x1="740" y1="1160" x2="300" y2="1160" class="arrow green" marker-end="url(#chgr)" style="--len:440"/>
+            <text x="748" y="1156" text-anchor="start" class="msgnum">21</text>
+            <rect x="300" y="1168" width="440" height="24" rx="8" fill="var(--green-soft)" stroke="var(--green)"/>
+            <text x="520" y="1184" text-anchor="middle" class="annot" fill="var(--green)">bureau de MachineDestination affiché — accès accordé à l'utilisateur</text>
+          </g>
+        </svg>
+      </div>
+      <div class="controls">
+        <div class="ctl-block">
+          <span class="h">Focus par phase</span>
+          <div class="pills" data-phasefor="vizChain">
+            <span class="pill on" data-phase="all">Tout</span>
+            <span class="pill" data-phase="l4">① L4 / TCP</span>
+            <span class="pill" data-phase="nla">② NLA</span>
+            <span class="pill" data-phase="tls">③ TLS</span>
+            <span class="pill" data-phase="kerb">④ Kerberos</span>
+            <span class="pill" data-phase="ntlm">⑤ NTLMv2</span>
+            <span class="pill" data-phase="val">⑥ Netlogon</span>
+            <span class="pill" data-phase="sess">⑦ Session</span>
+          </div>
+        </div>
+        <div class="ctl-block">
+          <span class="h">Couches activables</span>
+          <div class="pills">
+            <label class="lyr"><input type="checkbox" checked data-layer="keys" data-for="vizChain"> Clés / crypto</label>
+            <label class="lyr"><input type="checkbox" checked data-layer="spn" data-for="vizChain"> Résolution SPN</label>
+            <label class="lyr"><input type="checkbox" checked data-layer="net" data-for="vizChain"> Réseau L4 / Netlogon</label>
+            <label class="lyr"><input type="checkbox" checked data-layer="err" data-for="vizChain"> Annotations d'erreur</label>
+          </div>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--cyan)"></i>Client / NTLMv2</span>
+        <span><i style="background:var(--gold)"></i>Kerberos</span>
+        <span><i style="background:var(--violet)"></i>TLS / CredSSP</span>
+        <span><i style="background:var(--green)"></i>Succès</span>
+        <span><i style="background:var(--red)"></i>Échec</span>
+        <span style="color:var(--ink-3)">⚿ = matériel cryptographique · zone violette = canal TLS</span>
+      </div>
+    </div>
+
+    <div class="grid" style="grid-template-columns:1fr 1fr;gap:16px">
+      <div class="note warn"><span class="lab">Les 2 points de friction</span>
+        <p>① <strong>Identité TLS</strong> (étapes 6-8) : le certificat de MachineDestination doit porter <code>VIp-coop.zres.ztech</code> dans son SAN — sinon CredSSP refuse avant toute authentification. ② <strong>Échec Kerberos propre</strong> (étapes 9-13) : sans SPN sur la VIP, le KDC répond <code>S_PRINCIPAL_UNKNOWN</code> et SSPI bascule en NTLMv2. Si un SPN <code>TERMSRV/VIp-coop</code> traîne, Kerberos part sur un chemin qui casse côté backend.</p>
+      </div>
+      <div class="note ok"><span class="lab">Pourquoi la chaîne aboutit</span>
+        <p>NTLMv2 (étapes 14-16) n'utilise jamais le nom de connexion : le défi est émis par l'hôte <strong>terminal</strong>, la réponse lui revient, et c'est lui qui valide auprès du DC via Netlogon (étapes 17-18). Le F5 reste un simple tuyau L4. Une fois la délégation CredSSP faite (étapes 19-20), la session s'ouvre (21).</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 06 OPTION 1 (FOCUS) ============ -->
+  <section id="opt1">
+    <h2><span class="tag">06 · ★ Recommandée</span> Option 1 — Repli NTLMv2 propre + identité TLS</h2>
+    <p>C'est l'option adaptée à <strong>ton cas d'usage exact</strong> : une connexion RDP utilisateur via une VIP F5 maintenue en relais TCP L4, sans changer l'architecture. Le principe est contre-intuitif : <strong>on ne cherche surtout pas à faire marcher Kerberos</strong>, on s'assure qu'il bascule proprement en NTLMv2 et on règle la vérification d'identité de CredSSP par le certificat.</p>
+
+    <div class="note">
+      <span class="lab">Idée directrice</span>
+      <p>Kerberos est <em>incompatible</em> avec le L4 ici. On le laisse échouer côté résolution SPN (proprement, sans SPN enregistré sur la VIP) → SSPI bascule en NTLMv2, qui authentifie l'utilisateur directement contre MachineDestination. Reste à faire accepter le nom <code>VIp-coop</code> par NLA, via le certificat.</p>
+    </div>
+
+    <h3>Mise en place — pas à pas</h3>
+    <ol class="steps">
+      <li><b>Garantir l'absence de SPN sur la VIP</b>
+        Si un SPN <code>TERMSRV/VIp-coop</code> ou <code>HOST/VIp-coop</code> traîne sur un compte, il force un chemin Kerberos cassé. On vérifie et on supprime.
+        <pre class="cmd"><span class="c"># vérifier qu'aucun compte ne porte le SPN</span>
+setspn <span class="k">-Q</span> TERMSRV/VIp-coop
+setspn <span class="k">-Q</span> HOST/VIp-coop
+<span class="c"># si présent sur un compte, le retirer</span>
+setspn <span class="k">-D</span> TERMSRV/VIp-coop <span class="s">&lt;compte&gt;</span></pre>
+      </li>
+      <li><b>Corriger l'identité TLS (le vrai déblocage CredSSP)</b>
+        <mark>Déjà en place dans ton cas</mark> : un certificat est présent sur l'hôte avec <code>VIp-coop.zres.ztech</code> dans le SAN et l'EKU <em>Remote Desktop Authentication</em>. La condition d'identité de CredSSP est donc satisfaite — le blocage restant n'est plus le certificat mais la <strong>restriction NTLM</strong> (voir section 6b). À conserver : émettre aux hôtes du pool un certificat RDP dont le <strong>SAN inclut le FQDN de VIp-coop</strong> en plus de leur propre nom, idéalement via modèle PKI interne + GPO pointant l'empreinte pour TermService.
+        <pre class="cmd"><span class="c"># SAN présent sur l'hôte du pool :</span>
+DNS = MachineDestination.zcam.ztech
+DNS = <span class="s">VIp-coop.zres.ztech</span>   <span class="c"># ← présent · EKU Remote Desktop Authentication</span>
+<span class="c"># GPO : Computer > Admin Templates > Composants Windows ></span>
+<span class="c"># Services Bureau à distance > Sécurité > « Modèle de certificat d'authentification serveur »</span></pre>
+      </li>
+      <li><b>Confirmer que NTLMv2 est autorisé partout</b>
+        Vérifier <code>LmCompatibilityLevel = 5</code> (client &amp; serveurs) et qu'aucune politique « Restrict NTLM » ne bloque le trafic. Si « Restrict NTLM: outgoing/incoming » est actif, ajouter VIp-coop et les backends aux exceptions.
+        <pre class="cmd"><span class="c"># GPO : Options de sécurité</span>
+Sécurité réseau : niveau d'authentification LAN Manager
+  → <span class="s">Envoyer uniquement les réponses NTLMv2. Refuser LM &amp; NTLM</span>
+<span class="c"># si Restrict NTLM actif : ajouter aux exceptions de serveurs distants</span>
+  VIp-coop.zres.ztech</pre>
+      </li>
+      <li><b>Persistance sur la VIP F5</b>
+        Le défi/réponse NTLM et la session doivent rester sur le <strong>même backend</strong>. Configurer une persistance (au minimum <em>source-address affinity</em>) et aligner le <em>idle TCP timeout</em> sur la durée d'une session RDP.
+        <pre class="cmd"><span class="c"># F5 (concept) :</span>
+persistence  = source_addr   <span class="c"># colle un client à un backend</span>
+tcp idle timeout ≈ <span class="s">session RDP</span>  <span class="c"># éviter les coupures</span></pre>
+      </li>
+      <li><b>Côté client RDP — repli transitoire si besoin</b>
+        Une fois le certificat en place, garder NLA <strong>actif</strong>. Si tu dois débloquer temporairement avant le déploiement du cert, baisser le niveau d'authentification (avertir au lieu d'échouer). Désactiver NLA sur les backends est le <strong>dernier recours</strong> (vrai risque).
+        <pre class="cmd"><span class="c"># fichier .rdp — repli transitoire (avertir, ne pas bloquer)</span>
+authentication level:i:<span class="s">2</span>
+<span class="c"># cible : revenir à i:0 (ou retirer) une fois le cert SAN déployé</span></pre>
+      </li>
+    </ol>
+
+    <div class="grid" style="grid-template-columns:1fr 1fr;gap:16px">
+      <div class="note ok"><span class="lab">Avantages</span>
+        <p>Sans refonte d'architecture · garde la VIP en L4 · déblocage souvent immédiat via le certificat · NTLMv2 reste un mécanisme robuste pour l'auth utilisateur directe.</p>
+      </div>
+      <div class="note warn"><span class="lab">Limites à assumer</span>
+        <p>Pas d'auth mutuelle forte basée SPN · pas de délégation/double-saut · dépend de la santé du canal Netlogon · NTLM fait l'objet d'un durcissement progressif côté Microsoft (à surveiller à moyen terme).</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 6B TESTS NTLM 25H2 ============ -->
+  <section id="tests">
+    <h2><span class="tag">6b · ★ Tests</span> Validation du repli NTLMv2 — Windows 11 25H2</h2>
+    <p>Sur <strong>Windows 11 25H2</strong>, le repli NTLM est durci. À comprendre avant de toucher quoi que ce soit : <strong>NTLMv1 est supprimé</strong> du système, mais <strong>NTLMv2 fonctionne toujours</strong>. Donc le repli dont tu as besoin (NTLMv2 vers MachineDestination) reste possible — s'il est « bloqué », c'est une <em>politique de restriction</em> qui s'interpose, pas une absence du protocole. Comme ton certificat (SAN = VIp-coop.zres.ztech + EKU Remote Desktop Authentication) est déjà posé, l'identité CredSSP est réglée : il ne reste que la couche NTLM à diagnostiquer.</p>
+
+    <div class="note warn">
+      <span class="lab">À lire avant tout — conflit GPO / registre</span>
+      <p>Les réglages NTLM/LM ci-dessous sont des <strong>« options de sécurité »</strong> appliquées par l'extension Security Settings de la stratégie de groupe. Trois conséquences directes vu que <strong>tu ne peux pas modifier les GPO de domaine</strong> :</p>
+      <p>① <strong>Réécriture.</strong> Si une GPO de domaine positionne le même paramètre, ta modification locale du registre sera <strong>écrasée au prochain rafraîchissement de sécurité</strong> (toutes les ~90 min, à chaque <code>gpupdate</code>, au démarrage, et de toute façon ré-appliquée toutes les 16 h même inchangée). Une modif locale n'est donc qu'un <strong>outil de test temporaire</strong>, jamais une solution pérenne.</p>
+      <p>② <strong>Redémarrage.</strong> Ces valeurs sont lues par <strong>LSASS au démarrage</strong>. LSASS ne se redémarre pas à chaud → il faut <strong>redémarrer la machine</strong> pour qu'une modif (registre ou GPO) soit prise en compte. Un simple <code>gpupdate /force</code> applique la GPO mais ne fait pas relire ces clés à LSASS de façon fiable.</p>
+      <p>③ <strong>Solution pérenne.</strong> Le correctif définitif passe par l'équipe AD : ajouter <code>VIp-coop.zres.ztech</code> à l'exception <em>Restrict NTLM: Add remote server exceptions</em> dans la GPO. Donne-leur cette valeur exacte (section ci-dessous).</p>
+    </div>
+
+    <h3>Les clés de registre concernées</h3>
+    <p>Toutes sous <code>HKLM\SYSTEM\CurrentControlSet\Control\Lsa</code> (les trois dernières dans le sous-clé <code>\MSV1_0</code>). Réétiquetées « réécrites par GPO » si une stratégie de domaine les pilote.</p>
+    <table class="tbl">
+      <thead><tr><th>Valeur</th><th>Type</th><th>Rôle &amp; valeurs</th><th>Prise en compte</th></tr></thead>
+      <tbody>
+        <tr><td>LmCompatibilityLevel</td><td>DWORD</td><td>Niveau d'auth LAN Manager. <code>5</code> = n'envoie que NTLMv2, refuse LM &amp; NTLMv1</td><td class="no">Redémarrage</td></tr>
+        <tr><td>MSV1_0\RestrictSendingNTLMTraffic</td><td>DWORD</td><td><strong>Le suspect n°1.</strong> <code>0</code>=autorise · <code>1</code>=audit · <code>2</code>=refuse tout NTLM sortant</td><td class="no">Redémarrage</td></tr>
+        <tr><td>MSV1_0\ClientAllowedNTLMServers</td><td>REG_MULTI_SZ</td><td>Liste blanche des serveurs autorisés quand sortant=2. Un nom par ligne, <code>*</code> en joker</td><td class="no">Redémarrage</td></tr>
+        <tr><td>MSV1_0\RestrictReceivingNTLMTraffic</td><td>DWORD</td><td>Côté serveur (sur MachineDestination) : <code>0/1/2</code></td><td class="no">Redémarrage</td></tr>
+        <tr><td>BlockNTLMv1SSO</td><td>DWORD</td><td>Bloque les creds dérivées NTLMv1 (24H2/25H2). <code>0</code>=audit (défaut), <code>1</code>=bloque. N'affecte <em>pas</em> NTLMv2</td><td class="no">Redémarrage</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Correspondance GPO (pour l'équipe AD)</h3>
+    <p>Toutes sous <em>Configuration ordinateur → Stratégies → Paramètres Windows → Paramètres de sécurité → Stratégies locales → Options de sécurité</em> :</p>
+    <ul>
+      <li><strong>Sécurité réseau : niveau d'authentification LAN Manager</strong> → <code>LmCompatibilityLevel</code></li>
+      <li><strong>Restrict NTLM : trafic NTLM sortant vers les serveurs distants</strong> → <code>RestrictSendingNTLMTraffic</code></li>
+      <li><strong>Restrict NTLM : ajouter des exceptions de serveurs distants</strong> → <code>ClientAllowedNTLMServers</code> · <span class="mid">c'est ici qu'il faut ajouter <code>VIp-coop.zres.ztech</code></span></li>
+    </ul>
+
+    <h3>Étape 1 — Identifier ce qui bloque (sans rien modifier)</h3>
+    <p>D'abord lire l'état effectif. Le <strong>journal NTLM/Operational</strong> est l'outil décisif : tente la connexion RDP vers VIp-coop, puis cherche l'événement de blocage.</p>
+    <pre class="cmd"><span class="c"># 1. Quelle GPO impose le réglage ? (rapport résultant)</span>
+gpresult <span class="k">/h</span> <span class="s">$env:TEMP\rsop.html</span>   <span class="c"># ouvrir, chercher « Restrict NTLM » + « LAN Manager »</span>
+
+<span class="c"># 2. Lire les valeurs effectives actuelles</span>
+reg query <span class="s">"HKLM\SYSTEM\CurrentControlSet\Control\Lsa"</span> <span class="k">/v</span> LmCompatibilityLevel
+reg query <span class="s">"HKLM\SYSTEM\CurrentControlSet\Control\Lsa\MSV1_0"</span> <span class="k">/v</span> RestrictSendingNTLMTraffic
+reg query <span class="s">"HKLM\SYSTEM\CurrentControlSet\Control\Lsa\MSV1_0"</span> <span class="k">/v</span> ClientAllowedNTLMServers
+
+<span class="c"># 3. Smoking gun : événement de blocage NTLM sortant après tentative RDP</span>
+Get-WinEvent <span class="k">-FilterHashtable</span> @{LogName=<span class="s">'Microsoft-Windows-NTLM/Operational'</span>; Id=8001,4020} <span class="k">-MaxEvents</span> 20 |
+  Format-List TimeCreated, Id, Message
+<span class="c"># 8001 = « NTLM client blocked audit » : le sortant vers VIp-coop SERAIT/A ÉTÉ bloqué</span>
+<span class="c"># 4020 (24H2/25H2) = détaille la RAISON du choix NTLM, la version, le SPN visé</span></pre>
+
+    <div class="note">
+      <span class="lab">Lecture</span>
+      <p>Un événement <strong>8001</strong> dont le <em>TargetName</em> est <code>VIp-coop.zres.ztech</code> confirme que c'est bien <em>Restrict NTLM sortant</em> qui bloque (et non le certificat, ni Kerberos). Sur 25H2, l'événement <strong>4020</strong> est plus riche : il indique pourquoi NTLM a été choisi et le SPN visé — utile pour prouver que Kerberos a échoué « proprement » avant le repli.</p>
+    </div>
+
+    <h3>Étape 2 — Test local temporaire (sera réécrit par la GPO)</h3>
+    <p>Pour <strong>prouver</strong> que l'exception débloque la connexion, on l'ajoute localement, on redémarre, on teste vite. <mark>Ce n'est qu'un test</mark> : la GPO reprendra la main au prochain cycle.</p>
+    <pre class="cmd"><span class="c"># Ajouter VIp-coop à la liste blanche NTLM sortante (test)</span>
+$lsa = <span class="s">'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\MSV1_0'</span>
+Set-ItemProperty <span class="k">-Path</span> $lsa <span class="k">-Name</span> ClientAllowedNTLMServers `
+  <span class="k">-Type</span> MultiString <span class="k">-Value</span> @(<span class="s">'VIp-coop.zres.ztech'</span>, <span class="s">'*.zres.ztech'</span>)
+
+<span class="c"># (variante test brutal : tout réautoriser — uniquement en labo)</span>
+<span class="c"># Set-ItemProperty -Path $lsa -Name RestrictSendingNTLMTraffic -Type DWord -Value 0</span>
+
+Restart-Computer   <span class="c"># OBLIGATOIRE : LSASS relit au boot</span></pre>
+    <p style="color:var(--ink-3);font-size:13.5px">Astuce diagnostic : après le test, lance <code>gpupdate /force</code> puis re-vérifie la clé — si elle revient à sa valeur d'origine, tu as la preuve qu'une GPO de domaine la pilote (et donc qu'il faut passer par l'équipe AD).</p>
+
+    <h3>Étape 3 — Confirmer que c'est bien NTLMv2 (et pas un repli cassé)</h3>
+    <p>Une fois la connexion rétablie, vérifier <em>quel</em> protocole a été utilisé, côté MachineDestination.</p>
+    <pre class="cmd"><span class="c"># Sur MachineDestination — événement d'ouverture de session</span>
+Get-WinEvent <span class="k">-FilterHashtable</span> @{LogName=<span class="s">'Security'</span>; Id=4624} <span class="k">-MaxEvents</span> 10 |
+  Where-Object Message <span class="k">-match</span> <span class="s">'NtLmSsp'</span> | Format-List TimeCreated, Message
+<span class="c"># Chercher :  Authentication Package: NTLM   |   Package Name (NTLM only): NTLM V2</span>
+
+<span class="c"># Vérifier l'absence/présence de tickets Kerberos pour TERMSRV/VIp-coop</span>
+klist purge
+klist tickets       <span class="c"># aucun ticket TERMSRV/VIp-coop attendu → repli NTLM normal</span></pre>
+    <div class="note ok">
+      <span class="lab">Critère de succès</span>
+      <p>Connexion RDP qui aboutit + un <strong>4624</strong> sur MachineDestination indiquant <code>Logon Process: NtLmSsp</code> et <code>Package Name (NTLM only): NTLM V2</code> = repli NTLMv2 propre et fonctionnel.</p>
+      <p><strong>Piège connu :</strong> pour une session <em>anonyme</em>, l'audit peut afficher à tort « NTLM V1 » alors qu'aucune sécurité de session n'est en jeu — à ignorer. Ne te fie au champ version que pour ta vraie session utilisateur.</p>
+    </div>
+
+    <h3>Étape 4 — Demande à l'équipe AD (solution pérenne)</h3>
+    <p>Élément à transmettre, prêt à l'emploi :</p>
+    <div class="card">
+      <p style="margin-top:0"><strong>GPO :</strong> Options de sécurité → <em>Network security: Restrict NTLM: Add remote server exceptions for NTLM authentication</em></p>
+      <p><strong>Action :</strong> ajouter à la liste, ciblée sur l'OU des postes clients (<code>*.zcam.ztech</code>) :</p>
+      <pre class="cmd">VIp-coop.zres.ztech</pre>
+      <p style="margin-bottom:0;color:var(--ink-3);font-size:13.5px">Le nom à lister est le <strong>nom de connexion</strong> (la VIP), pas MachineDestination — c'est ce nom que le client place comme cible NTLM. Joker possible : <code>*.zres.ztech</code> si plusieurs VIP. À appliquer côté <em>client</em> (sortant) ; redémarrage requis.</p>
+    </div>
+
+    <div class="note warn">
+      <span class="lab">Si malgré l'exception ça ne passe toujours pas</span>
+      <p>Vérifier dans l'ordre : (a) <strong>Credential Guard</strong> actif — il bloque le NTLMv1-dérivé mais laisse passer NTLMv2 ; sans incidence ici sauf si une appli force NTLMv1. (b) <code>RestrictReceivingNTLMTraffic</code> côté <strong>MachineDestination</strong> réglé sur « refuser » sans exception. (c) Le tout autre message « la fonction demandée n'est pas prise en charge » → c'est le patch CredSSP (CVE-2018-0886), problème distinct traité en section 05.</p>
+    </div>
+  </section>
+
+  <!-- ============ 07 OPTION 2 ============ -->
+  <section id="opt2">
+    <h2><span class="tag">07</span> Option 2 — SPN sur un compte de service partagé</h2>
+    <p>C'est l'idée d'origine : créer un compte de service portant le SPN de la VIP. Techniquement valable, mais <strong>uniquement pour un service applicatif tournant sous ce compte</strong> — donc <span class="no">pas pour RDP</span>.</p>
+
+    <div class="viz">
+      <div class="viz-bar"><span class="ttl">Clé partagée sur le pool</span></div>
+      <div class="viz-body">
+        <svg viewBox="0 0 1000 210" role="img" aria-label="SPN compte de service">
+          <defs><marker id="o2" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="var(--gold)"/></marker></defs>
+          <rect x="360" y="14" width="280" height="58" rx="12" class="actorbox" stroke="var(--gold)"/>
+          <text x="500" y="38" text-anchor="middle" class="actorlabel">svc-relai (gMSA)</text>
+          <text x="500" y="56" text-anchor="middle" class="actorsub">SPN : MonService/VIp-coop · une seule clé</text>
+          <g>
+            <rect x="60" y="130" width="200" height="56" rx="10" class="actorbox"/><text x="160" y="163" text-anchor="middle" class="actorsub">Backend 1 · sous svc-relai</text>
+            <rect x="400" y="130" width="200" height="56" rx="10" class="actorbox"/><text x="500" y="163" text-anchor="middle" class="actorsub">Backend 2 · sous svc-relai</text>
+            <rect x="740" y="130" width="200" height="56" rx="10" class="actorbox"/><text x="840" y="163" text-anchor="middle" class="actorsub">Backend N · sous svc-relai</text>
+          </g>
+          <line x1="450" y1="72" x2="180" y2="128" class="arrow gold" marker-end="url(#o2)"/>
+          <line x1="500" y1="74" x2="500" y2="128" class="arrow gold" marker-end="url(#o2)"/>
+          <line x1="550" y1="72" x2="820" y2="128" class="arrow gold" marker-end="url(#o2)"/>
+          <text x="500" y="108" text-anchor="middle" class="annot" fill="var(--gold)">⚿ clé partagée → tous déchiffrent le ticket de la VIP</text>
+        </svg>
+      </div>
+    </div>
+
+    <pre class="cmd"><span class="c"># compte de service managé de groupe (recommandé)</span>
+New-ADServiceAccount svc-relai ...
+setspn <span class="k">-S</span> MonService/VIp-coop svc-relai
+<span class="c"># puis : faire tourner LE service applicatif sous svc-relai sur TOUS les nœuds</span></pre>
+
+    <div class="note warn">
+      <span class="lab">Pourquoi ça ne s'applique pas à RDP</span>
+      <p>TermService tourne sous l'<strong>identité machine</strong>, pas sous un compte custom : impossible de lui faire utiliser la clé partagée <code>svc-relai</code>. Rappel d'unicité : un SPN est unique dans la forêt — on ne peut pas le poser à la fois sur le compte machine et sur svc-relai. Cette option vaut pour une appli métier maison ou un service type SQL/IIS en ferme, pas pour la connexion RDP visée ici.</p>
+    </div>
+  </section>
+
+  <!-- ============ 08 OPTION 3 ============ -->
+  <section id="opt3">
+    <h2><span class="tag">08</span> Option 3 — Kerberos « propre » : F5 APM ou RD Broker</h2>
+    <p>Si Kerberos devient non négociable (auth mutuelle, délégation, double-saut), il faut <strong>sortir du relais L4</strong>. Deux voies, toutes deux en L7.</p>
+
+    <div class="grid" style="grid-template-columns:1fr 1fr;gap:16px">
+      <div class="card">
+        <h3 style="margin-top:0">3a · F5 APM + Kerberos SSO/KCD</h3>
+        <p>L'APM <strong>termine</strong> la connexion, authentifie l'utilisateur, puis effectue une <strong>délégation contrainte (KCD)</strong> pour obtenir un ticket vers le <em>vrai</em> SPN du backend choisi. C'est la réponse native F5 au double-saut.</p>
+        <p style="color:var(--ink-3);font-size:13.5px">Coût : module APM, configuration KCD côté AD, ce n'est plus du L4.</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">3b · RD Connection Broker</h3>
+        <p>Le Broker, derrière la VIP, <strong>redirige</strong> le client vers la machine cible réelle (jeton de redirection). Le client redemande alors un ticket pour le <strong>SPN réel de MachineDestination</strong> → Kerberos fonctionne nativement.</p>
+        <p style="color:var(--ink-3);font-size:13.5px">Coût : rôle RDS/Broker, la VIP route vers le Broker, plus du relais TCP simple.</p>
+      </div>
+    </div>
+
+    <div class="viz">
+      <div class="viz-bar"><span class="ttl">Principe L7 · terminaison + ticket vers le vrai SPN</span></div>
+      <div class="viz-body">
+        <svg viewBox="0 0 1000 150" role="img" aria-label="Option 3 L7">
+          <defs><marker id="o3" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="var(--gold)"/></marker></defs>
+          <rect x="30" y="48" width="200" height="54" rx="11" class="actorbox" stroke="var(--cyan)"/><text x="130" y="80" text-anchor="middle" class="actorsub">MachineClient</text>
+          <rect x="330" y="48" width="240" height="54" rx="11" class="actorbox" stroke="var(--gold)"/>
+          <text x="450" y="72" text-anchor="middle" class="actorsub">APM / Broker (L7)</text>
+          <text x="450" y="90" text-anchor="middle" class="annot">termine + KCD/redirection</text>
+          <rect x="700" y="48" width="270" height="54" rx="11" class="actorbox" stroke="var(--violet)"/>
+          <text x="835" y="72" text-anchor="middle" class="actorsub">MachineDestination</text>
+          <text x="835" y="90" text-anchor="middle" class="annot" fill="var(--gold)">ticket pour son VRAI SPN</text>
+          <line x1="232" y1="75" x2="328" y2="75" class="arrow" marker-end="url(#o3)"/>
+          <line x1="572" y1="75" x2="698" y2="75" class="arrow gold" marker-end="url(#o3)"/>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 09 COMPARATIF ============ -->
+  <section id="compare">
+    <h2><span class="tag">09</span> Comparatif des trois options</h2>
+    <table class="tbl">
+      <thead><tr><th>Critère</th><th>① Repli NTLMv2 ★</th><th>② SPN service</th><th>③ APM / Broker</th></tr></thead>
+      <tbody>
+        <tr><td>Adapté à RDP</td><td class="yes">Oui</td><td class="no">Non</td><td class="yes">Oui</td></tr>
+        <tr><td>Garde la VIP en L4</td><td class="yes">Oui</td><td class="mid">Selon appli</td><td class="no">Non (L7)</td></tr>
+        <tr><td>Protocole d'auth</td><td>NTLMv2</td><td>Kerberos</td><td>Kerberos</td></tr>
+        <tr><td>Effort de mise en place</td><td class="yes">Faible</td><td class="mid">Moyen</td><td class="no">Élevé</td></tr>
+        <tr><td>Auth mutuelle / délégation</td><td class="no">Non</td><td class="yes">Oui</td><td class="yes">Oui</td></tr>
+        <tr><td>Changement d'architecture</td><td class="yes">Aucun</td><td class="mid">Léger</td><td class="no">Important</td></tr>
+        <tr><td>Pérennité long terme</td><td class="mid">Moyenne</td><td class="yes">Bonne</td><td class="yes">Bonne</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ 10 RECO ============ -->
+  <section id="reco">
+    <h2><span class="tag">10</span> Recommandation & checklist</h2>
+    <div class="note ok">
+      <span class="lab">Recommandation</span>
+      <p>Pour ton cas (RDP utilisateur, VIP L4 imposée), pars sur l'<strong>option 1</strong>. Le déclencheur réel du déblocage CredSSP est presque toujours le <strong>certificat avec SAN couvrant VIp-coop</strong> ; le reste (absence de SPN sur la VIP, NTLMv2 autorisé, persistance F5) sécurise le repli. Garde l'option 3 (APM/Broker) en ligne de mire si un besoin de délégation/double-saut apparaît plus tard.</p>
+    </div>
+    <h3>Checklist opérationnelle</h3>
+    <table class="tbl">
+      <thead><tr><th>#</th><th>Action</th><th>Effet</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td><code>setspn -Q TERMSRV/VIp-coop</code> → vide / supprimer</td><td>Force un repli NTLM propre</td></tr>
+        <tr><td>2</td><td>Cert RDP avec SAN = VIp-coop sur les backends</td><td class="yes">Règle l'erreur d'identité CredSSP</td></tr>
+        <tr><td>3</td><td><code>ClientAllowedNTLMServers</code> ← <code>VIp-coop.zres.ztech</code> (via GPO AD) + reboot</td><td class="yes">Débloque le repli NTLM (Win11 25H2)</td></tr>
+        <tr><td>3b</td><td>Diagnostic : NTLM/Operational ev. 8001/4020 ; succès = 4624 « NTLM V2 »</td><td>Valide le repli</td></tr>
+        <tr><td>4</td><td>Persistance source-addr + idle timeout F5</td><td>Stabilité du défi/réponse</td></tr>
+        <tr><td>5</td><td>NLA actif ; <code>authentication level:i:2</code> en transitoire</td><td>Sécurité maintenue</td></tr>
+        <tr><td>6</td><td>Si « fonction non prise en charge » → patch CredSSP</td><td>Problème distinct (CVE-2018-0886)</td></tr>
+      </tbody>
+    </table>
+    <p style="color:var(--ink-3);font-size:13px;margin-top:26px;border-top:1px solid var(--line);padding-top:16px">Note d'architecture interne · Kerberos × NTLMv2 sur VIP F5 L4. Les noms de commandes/GPO sont donnés à titre indicatif et à valider sur la version exacte de l'OS et du firmware F5.</p>
+  </section>
+</main>
+</div>
+
+<script>
+/* ---------- THEME ---------- */
+function toggleTheme(){
+  const r=document.documentElement;
+  r.dataset.theme = r.dataset.theme==='dark' ? 'light' : 'dark';
+}
+
+/* ---------- ANIMATION (play / reset) ---------- */
+const timers={};
+function getSteps(viz){
+  return [...viz.querySelectorAll('.step')]
+    .filter(g=>!g.classList.contains('dimmed-perm'))
+    .sort((a,b)=>(+a.dataset.step)-(+b.dataset.step));
+}
+function playViz(id){
+  const viz=document.getElementById(id);
+  viz.dataset.anim='on';
+  const steps=getSteps(viz);
+  steps.forEach(s=>s.classList.remove('shown'));
+  clearTimers(id);
+  timers[id]=[];
+  steps.forEach((s,i)=>{
+    timers[id].push(setTimeout(()=>s.classList.add('shown'), 520*i+120));
+  });
+  // after last, leave everything shown
+}
+function resetViz(id){
+  const viz=document.getElementById(id);
+  clearTimers(id);
+  viz.dataset.anim='off';
+  getSteps(viz).forEach(s=>s.classList.remove('shown'));
+}
+function clearTimers(id){ (timers[id]||[]).forEach(clearTimeout); timers[id]=[]; }
+
+document.querySelectorAll('[data-play]').forEach(b=>b.addEventListener('click',()=>playViz(b.dataset.play)));
+document.querySelectorAll('[data-reset]').forEach(b=>b.addEventListener('click',()=>resetViz(b.dataset.reset)));
+
+/* ---------- PHASE FOCUS ---------- */
+document.querySelectorAll('[data-phasefor]').forEach(grp=>{
+  const vizId=grp.dataset.phasefor;
+  const viz=document.getElementById(vizId);
+  grp.querySelectorAll('.pill').forEach(p=>{
+    p.addEventListener('click',()=>{
+      grp.querySelectorAll('.pill').forEach(x=>x.classList.remove('on'));
+      p.classList.add('on');
+      const ph=p.dataset.phase;
+      viz.querySelectorAll('.step').forEach(s=>{
+        s.classList.toggle('dimmed', ph!=='all' && s.dataset.phase!==ph);
+      });
+    });
+  });
+});
+
+/* ---------- LAYER TOGGLES ---------- */
+document.querySelectorAll('input[data-layer]').forEach(cb=>{
+  cb.addEventListener('change',()=>{
+    const viz=document.getElementById(cb.dataset.for);
+    viz.classList.toggle('hide-'+cb.dataset.layer, !cb.checked);
+  });
+});
+
+/* ---------- SCROLLSPY NAV ---------- */
+const links=[...document.querySelectorAll('nav.side a')];
+const map=new Map(links.map(a=>[a.getAttribute('href').slice(1),a]));
+const obs=new IntersectionObserver(es=>{
+  es.forEach(e=>{
+    if(e.isIntersecting){
+      links.forEach(l=>l.classList.remove('active'));
+      const a=map.get(e.target.id); if(a)a.classList.add('active');
+    }
+  });
+},{rootMargin:'-20% 0px -70% 0px'});
+document.querySelectorAll('section[id]').forEach(s=>obs.observe(s));
+
+/* close mobile nav on link click */
+links.forEach(a=>a.addEventListener('click',()=>document.querySelector('nav.side').classList.remove('open')));
+</script>
+</body>
+</html>
