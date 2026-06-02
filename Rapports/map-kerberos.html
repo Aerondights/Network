@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pourquoi Kerberos ne s'applique pas — VIp-coop · F5 (L4)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ================= TOKENS ================= */
+:root{
+  --bg:#F3F7F5; --bg2:#EBF1EE; --panel:#FFFFFF; --panel2:#F5FAF7; --panel3:#EAF2ED;
+  --line:#CAE0D4; --line2:#B2CFC2; --line3:#8FB5A5;
+  --ink:#10261E; --ink2:#375E50; --ink3:#6F9885;
+  --gold:#00843D; --cyan:#005A38; --violet:#3D6FA8; --green:#186C35; --red:#C23030; --amber:#B26A0C;
+  --tone:var(--cyan);
+  --grid:rgba(0,90,56,.028);
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --sans:'Open Sans',system-ui,sans-serif;
+  --shadow:0 4px 22px -8px rgba(0,90,56,.16);
+}
+[data-theme="dark"]{
+  --bg:#0C1714; --bg2:#0F1C18; --panel:#12211C; --panel2:#16271F; --panel3:#1B2F26;
+  --line:#284A3C; --line2:#356152; --line3:#4E8270;
+  --ink:#EAF3EE; --ink2:#A8C7B9; --ink3:#6F9885;
+  --gold:#1FBF66; --cyan:#37C98C; --violet:#6FA3DC; --green:#37C98C; --red:#E5736B; --amber:#D69838;
+  --grid:rgba(0,168,79,.05);
+  --shadow:0 12px 34px -14px rgba(0,0,0,.65);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; color:var(--ink); background:
+    radial-gradient(900px 500px at 85% -10%, color-mix(in srgb,var(--gold) 9%,transparent), transparent 60%),
+    linear-gradient(180deg,var(--bg2),var(--bg));
+  background-attachment:fixed;
+  font-family:var(--sans); font-size:15px; line-height:1.55;
+  -webkit-font-smoothing:antialiased; overflow-x:hidden;
+}
+::selection{background:var(--cyan);color:#fff}
+.app{display:flex;flex-direction:column;min-height:100vh}
+
+/* ---- HEADER ---- */
+header{
+  display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+  padding:14px 24px;border-bottom:1px solid #004538;background:#00594F;
+}
+.brand{display:flex;align-items:center;gap:13px;margin-right:auto;min-width:0}
+.brand .mk{width:30px;height:30px;border-radius:8px;flex:0 0 auto;position:relative;
+  background:radial-gradient(circle at 30% 30%,#00A84F,#003828);
+  box-shadow:0 0 0 4px rgba(0,168,79,.22),0 0 18px rgba(0,168,79,.28)}
+.brand .mk::before{content:"CA";position:absolute;inset:0;display:grid;place-items:center;
+  font-family:var(--sans);font-weight:800;font-size:10.5px;color:#fff;letter-spacing:.06em}
+.brand h1{font-weight:800;font-size:16px;letter-spacing:.01em;margin:0;line-height:1.12;color:#fff}
+.brand small{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.70);margin-top:2px}
+.verdict{font-family:var(--mono);font-size:12px;display:flex;gap:8px;align-items:center;
+  border:1px solid rgba(255,255,255,.30);border-radius:999px;padding:6px 14px;background:rgba(255,255,255,.10);white-space:nowrap;color:#fff}
+.verdict .x{color:#FFC9C4;font-weight:600} .verdict .sep{color:rgba(255,255,255,.44)}
+.tools{display:flex;gap:9px;flex-wrap:wrap}
+.tbtn{font-family:var(--mono);font-size:12px;cursor:pointer;border:1px solid rgba(255,255,255,.27);background:rgba(255,255,255,.09);
+  color:rgba(255,255,255,.82);border-radius:9px;padding:8px 13px;display:inline-flex;gap:8px;align-items:center;transition:.16s;white-space:nowrap}
+.tbtn:hover{border-color:rgba(255,255,255,.60);color:#fff;background:rgba(255,255,255,.17)}
+.tbtn.on{border-color:#fff;color:#fff;background:rgba(255,255,255,.22)}
+
+/* ---- INTRO STRIP ---- */
+.intro{max-width:1200px;margin:0 auto;padding:16px 24px 4px;width:100%}
+.intro p{margin:0;color:var(--ink2);font-size:14px;max-width:80ch}
+.intro b{color:var(--ink)}
+.intro code{font-family:var(--mono);font-size:.9em;color:var(--gold);background:color-mix(in srgb,var(--gold) 12%,transparent);border-radius:5px;padding:1px 6px}
+
+/* ---- MAIN (map) ---- */
+main{display:grid;grid-template-columns:1fr 372px;gap:0;max-width:1200px;width:100%;margin:14px auto 0;
+  border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--panel);box-shadow:var(--shadow)}
+.stage{position:relative;min-width:0;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:16px 18px;
+  background-image:radial-gradient(var(--grid) 1px,transparent 1px);background-size:22px 22px}
+.stage svg{width:100%;height:auto;max-height:520px;display:block}
+
+/* ---- SVG map ---- */
+.box{fill:var(--panel);stroke:var(--line2);stroke-width:1.4;transition:.35s}
+.node .nm{fill:var(--ink);font-family:var(--sans);font-weight:700;text-anchor:middle}
+.node .role{fill:var(--ink3);font-family:var(--mono);text-anchor:middle}
+.node .fq{fill:var(--ink3);font-family:var(--mono);text-anchor:middle;opacity:.8}
+.node .ic{stroke:var(--ink2);fill:none;stroke-width:1.5}
+.node.on .box{stroke:var(--tone);stroke-width:2.2;filter:drop-shadow(0 4px 12px color-mix(in srgb,var(--tone) 30%,transparent))}
+.node.on .nm{fill:var(--ink)}
+.node.dim{opacity:.34;transition:.35s}
+.node.bad .box{stroke:var(--red);stroke-width:2.4}
+.node.good .box{stroke:var(--green);stroke-width:2.4}
+.pool-bg{fill:color-mix(in srgb,var(--gold) 5%,transparent);stroke:var(--line2);stroke-width:1.2;stroke-dasharray:5 4;rx:14}
+.pool-label{fill:var(--ink3);font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase}
+.link{stroke:var(--line3);stroke-width:1.6;fill:none;opacity:.5;transition:.35s}
+.link.on{stroke:var(--tone);stroke-width:2.4;opacity:1;stroke-dasharray:7 6;animation:flow 1s linear infinite}
+.link.bad.on{stroke:var(--red)}
+@keyframes flow{to{stroke-dashoffset:-26}}
+.anno{fill:var(--ink3);font-family:var(--mono);font-size:10px;text-anchor:middle;opacity:0;transition:.3s}
+.anno.show{opacity:1}
+.anno.err{fill:var(--red);font-weight:600}
+.anno.ok{fill:var(--green);font-weight:600}
+.keytag{transition:.35s}
+#packet{filter:drop-shadow(0 0 6px currentColor);transition:fill .3s}
+
+/* ---- PANEL ---- */
+.panel{border-left:1px solid var(--line);background:linear-gradient(180deg,var(--panel),var(--bg2));
+  padding:22px 22px 18px;display:flex;flex-direction:column;gap:14px;min-height:520px}
+.step-head{display:flex;align-items:center;gap:12px}
+.idx{font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.1em}
+.badge{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;
+  padding:5px 12px;border-radius:999px;border:1px solid var(--tone);color:var(--tone);
+  background:color-mix(in srgb,var(--tone) 12%,transparent);transition:.3s}
+.phase{font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.16em;text-transform:uppercase}
+.lead{font-weight:700;font-size:20px;line-height:1.24;margin:0;letter-spacing:-.01em;color:var(--ink)}
+.lead code{font-family:var(--mono);font-size:.82em;color:var(--gold);background:color-mix(in srgb,var(--gold) 13%,transparent);border-radius:5px;padding:1px 5px}
+.key{border-left:3px solid var(--tone);background:color-mix(in srgb,var(--tone) 9%,transparent);
+  border-radius:0 10px 10px 0;padding:11px 14px;font-size:13.5px;color:var(--ink)}
+.key.warn{--tone:var(--red)} .key.ok{--tone:var(--green)}
+.key b{color:var(--tone)} .key code{font-family:var(--mono);font-size:.86em}
+.tech{border:1px solid var(--line2);border-radius:12px;padding:13px 15px;background:var(--panel2)}
+.tech .tl{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);display:flex;gap:8px;align-items:center;margin-bottom:7px}
+.tech .tl::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--gold)}
+.tech p{margin:0;font-family:var(--mono);font-size:12.3px;line-height:1.6;color:var(--ink2)}
+.tech code{font-family:var(--mono);color:var(--gold)}
+.app:not(.show-tech) .tech{display:none}
+.spacer{flex:1 1 auto}
+.hint{font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.04em}
+
+/* ---- TIMELINE ---- */
+.footer{max-width:1200px;width:100%;margin:0 auto;display:flex;align-items:center;gap:14px;padding:14px 4px 2px}
+.ctrls{display:flex;gap:7px;flex:0 0 auto}
+.cbtn{width:40px;height:40px;cursor:pointer;border:1px solid var(--line2);background:var(--panel);color:var(--ink);
+  border-radius:10px;font-size:16px;display:grid;place-items:center;transition:.15s}
+.cbtn:hover{border-color:var(--gold);color:var(--gold)}
+.cbtn.play{background:var(--cyan);color:#fff;border-color:var(--cyan)}
+.cbtn.play:hover{filter:brightness(1.12)}
+.track{display:flex;gap:6px;flex:1 1 auto;min-width:0}
+.seg{flex:1 1 0;min-width:0;cursor:pointer;border:1px solid var(--line2);background:var(--panel);
+  border-radius:9px;padding:8px 9px;display:flex;flex-direction:column;gap:3px;transition:.18s}
+.seg:hover{border-color:var(--line3)}
+.seg .sn{font-family:var(--mono);font-size:10px;color:var(--ink3);letter-spacing:.06em}
+.seg .sl{font-family:var(--mono);font-size:11px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.seg.done{background:var(--panel2)}
+.seg.active{border-color:var(--tone);background:color-mix(in srgb,var(--tone) 13%,transparent)}
+
+/* ================= SECTIONS ================= */
+section{max-width:1200px;width:100%;margin:30px auto 0;padding:0 4px}
+.sec-h{display:flex;align-items:baseline;gap:13px;flex-wrap:wrap;margin-bottom:16px}
+.sec-h .tag{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+  color:#fff;background:var(--cyan);border-radius:6px;padding:4px 9px;font-weight:600}
+.sec-h h2{font-weight:800;font-size:22px;margin:0;letter-spacing:-.01em;color:var(--ink)}
+.sec-h .sub{font-family:var(--mono);font-size:11.5px;color:var(--ink3);margin-left:auto}
+
+/* ---- ENCRYPTION EXPLAINER ---- */
+.enc{border:1px solid var(--line);border-radius:16px;background:var(--panel);box-shadow:var(--shadow);overflow:hidden}
+.enc-top{padding:18px 22px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,var(--panel2),transparent)}
+.enc-top p{margin:0;color:var(--ink2);font-size:14px;max-width:90ch}
+.enc-top b{color:var(--ink)}
+.enc-top code{font-family:var(--mono);font-size:.9em;color:var(--gold);background:color-mix(in srgb,var(--gold) 12%,transparent);border-radius:5px;padding:1px 6px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;padding:16px 22px 0}
+.tab{font-family:var(--mono);font-size:12px;cursor:pointer;border:1px solid var(--line2);background:var(--panel2);
+  color:var(--ink2);border-radius:9px 9px 0 0;padding:9px 14px;transition:.16s;border-bottom:none;position:relative;top:1px}
+.tab:hover{color:var(--ink)}
+.tab.on{color:var(--ink);background:var(--panel);border-color:var(--line);font-weight:600}
+.tab.on.fail{box-shadow:inset 0 -3px 0 var(--red)} .tab.on.pass{box-shadow:inset 0 -3px 0 var(--green)}
+.enc-stage{padding:26px 22px 30px;border-top:1px solid var(--line)}
+.flow{display:grid;grid-template-columns:1fr auto 1fr auto 1.1fr;gap:14px;align-items:center}
+@media(max-width:860px){.flow{grid-template-columns:1fr;gap:18px}.arrow{transform:rotate(90deg)}}
+.cell{border:1px solid var(--line2);border-radius:14px;padding:16px;background:var(--panel2);text-align:center}
+.cell .lbl{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink3);margin-bottom:10px}
+.cell .who{font-weight:700;font-size:14px;color:var(--ink);margin-bottom:3px}
+.cell .sub{font-family:var(--mono);font-size:11px;color:var(--ink3)}
+.arrow{color:var(--ink3);font-size:22px;text-align:center}
+
+/* lock + ticket */
+.ticket{position:relative;display:inline-flex;flex-direction:column;align-items:center;gap:9px;margin-bottom:6px}
+.lock{width:62px;height:62px}
+.lock .body{fill:color-mix(in srgb,var(--kc) 16%,var(--panel));stroke:var(--kc);stroke-width:2.4;transition:.4s}
+.lock .shackle{fill:none;stroke:var(--kc);stroke-width:5;stroke-linecap:round;transform-origin:32px 24px;transition:transform .45s cubic-bezier(.3,1.4,.5,1),stroke .4s}
+.lock .hole{fill:var(--kc);transition:.4s}
+.enc-stage[data-open="1"] .lock .shackle{transform:rotate(-26deg) translateX(-5px)}
+.enc-stage[data-fail="1"] .lock{animation:shake .5s}
+@keyframes shake{10%,90%{transform:translateX(-1px)}20%,80%{transform:translateX(2px)}30%,50%,70%{transform:translateX(-4px)}40%,60%{transform:translateX(4px)}}
+.keychip{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:12px;color:var(--ink);
+  border:1px solid var(--line2);border-radius:999px;padding:6px 12px;background:var(--panel)}
+.keychip .dot{width:12px;height:12px;border-radius:3px;background:var(--kc);box-shadow:0 0 0 3px color-mix(in srgb,var(--kc) 22%,transparent)}
+.keyglyph{width:16px;height:16px;color:var(--kc)}
+
+/* verdict cell */
+.vcell{border-radius:14px;padding:18px 16px;text-align:center;border:1.5px solid var(--vc);background:color-mix(in srgb,var(--vc) 8%,var(--panel))}
+.vcell .mark{font-size:30px;line-height:1;margin-bottom:8px;color:var(--vc)}
+.vcell .vtxt{font-weight:700;font-size:15px;color:var(--ink)}
+.vcell .err{font-family:var(--mono);font-size:11.5px;color:var(--vc);margin-top:6px;font-weight:600}
+.vcell .note{font-size:12.5px;color:var(--ink2);margin-top:8px}
+.match-line{text-align:center;margin-top:20px;font-family:var(--mono);font-size:12.5px;color:var(--ink2)}
+.match-line b{color:var(--ink)}
+.match-line .eq{color:var(--green);font-weight:700} .match-line .neq{color:var(--red);font-weight:700}
+
+/* ---- CARD GRIDS ---- */
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:860px){.cards{grid-template-columns:1fr}}
+.card{border:1px solid var(--line);border-radius:14px;padding:18px;background:var(--panel);box-shadow:var(--shadow);position:relative;overflow:hidden}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--cc,var(--cyan))}
+.card .cn{font-family:var(--mono);font-size:11px;color:var(--cc,var(--cyan));font-weight:600;letter-spacing:.08em}
+.card h3{font-size:15.5px;margin:6px 0 8px;color:var(--ink);font-weight:700}
+.card p{margin:0;font-size:13.5px;color:var(--ink2);line-height:1.55}
+.card code{font-family:var(--mono);font-size:.88em;color:var(--gold);background:color-mix(in srgb,var(--gold) 12%,transparent);border-radius:5px;padding:1px 5px}
+.card.warn{--cc:var(--red)} .card.ok{--cc:var(--green)} .card.alt{--cc:var(--violet)}
+.card .tradeoff{margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--ink3);border-top:1px dashed var(--line2);padding-top:9px}
+
+footer.foot{max-width:1200px;width:100%;margin:34px auto 30px;padding:16px 4px 0;border-top:1px solid var(--line);
+  font-family:var(--mono);font-size:11px;color:var(--ink3);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div class="app show-tech" id="app">
+
+  <!-- HEADER -->
+  <header>
+    <div class="brand">
+      <div class="mk"></div>
+      <div><h1>Chaîne d'authentification RDP — Kerberos</h1><small>VIp-coop · F5 niveau 4 · pourquoi le ticket ne peut pas aboutir</small></div>
+    </div>
+    <div class="verdict"><span>Kerberos</span><span class="sep">·</span><span class="x">✗ non applicable derrière une VIP L4</span></div>
+    <div class="tools">
+      <button class="tbtn on" id="techBtn"><span>⚙</span> Détails techniques</button>
+      <button class="tbtn" id="themeBtn"><span>◑</span> Thème</button>
+    </div>
+  </header>
+
+  <!-- INTRO -->
+  <div class="intro">
+    <p><b>Le décor :</b> le client (<code>mstsc</code>) vise le nom virtuel <code>VIp-coop.zres.ztech</code>. Le F5 est un <b>pur relais TCP (L4)</b> qui transmet les octets vers <b>un backend d'un pool</b> sans rien terminer. La question : peut-on faire fonctionner Kerberos ici — en créant un SPN sur la VIP, en le liant à un compte de service, ou autrement&nbsp;? La réponse tient dans <b>une seule clé de chiffrement</b>.</p>
+  </div>
+
+  <!-- MAP -->
+  <main>
+    <div class="stage">
+      <svg id="map" viewBox="0 0 980 540" role="img" aria-label="Carte Kerberos">
+        <defs>
+          <marker id="arrow" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6" fill="none" stroke="var(--line3)" stroke-width="1.3"/>
+          </marker>
+        </defs>
+
+        <!-- LINKS -->
+        <path id="lk-kerb"  class="link" d="M165,300 C165,180 270,84 380,84"/>
+        <path id="lk-tgs"   class="link" d="M392,98 C300,160 220,210 200,300"/>
+        <path id="lk-tcp"   class="link" d="M262,344 H378"/>
+        <path id="lk-fwd"   class="link bad" d="M558,344 H700"/>
+        <!-- packet paths (invisible) -->
+        <path id="pp-kerb"  d="M165,300 C165,180 270,84 380,84" fill="none" stroke="none"/>
+        <path id="pp-tgs"   d="M470,118 C470,170 320,250 200,300" fill="none" stroke="none"/>
+        <path id="pp-spine" d="M165,344 H558 C620,344 650,330 700,318" fill="none" stroke="none"/>
+
+        <!-- annotations -->
+        <text class="anno" id="an-port" x="232" y="186">Kerberos · TCP/UDP 88</text>
+        <text class="anno" id="an-search" x="470" y="40">recherche : qui porte TERMSRV/VIp-coop ?</text>
+        <text class="anno err" id="an-unknown" x="470" y="40">✗ aucun compte → KRB5KDC_ERR_S_PRINCIPAL_UNKNOWN</text>
+        <text class="anno" id="an-lock" x="540" y="150">ticket chiffré avec la clé du compte porteur</text>
+        <text class="anno err" id="an-modified" x="795" y="246">✗ clé ≠ → KRB5KRB_AP_ERR_MODIFIED</text>
+        <text class="anno" id="an-route" x="629" y="332">octets relayés (L4)</text>
+
+        <!-- KDC -->
+        <g class="node" id="n-kdc">
+          <rect class="box" x="380" y="50" width="180" height="68" rx="13"/>
+          <path class="ic" d="M400,84 a7,7 0 1,0 0.01,0 M407,84 H423 M423,79 V89 M419,79 V89"/>
+          <text class="nm" x="478" y="80" font-size="13.5">KDC</text>
+          <text class="role" x="478" y="97" font-size="9.5">Active Directory · AS / TGS</text>
+          <text class="fq" x="478" y="110" font-size="8.5">krbtgt · détient les clés de comptes</text>
+        </g>
+
+        <!-- CLIENT -->
+        <g class="node" id="n-client">
+          <rect class="box" x="72" y="304" width="186" height="80" rx="13"/>
+          <rect class="ic" x="92" y="330" width="26" height="18" rx="2"/>
+          <path class="ic" d="M101,348 v5 M109,348 v5 M97,353 h16"/>
+          <text class="nm" x="178" y="334" font-size="13.5">MachineClient</text>
+          <text class="role" x="178" y="350" font-size="9.5">poste utilisateur · mstsc · SSPI</text>
+          <text class="fq" x="178" y="365" font-size="9">MachineClient.zcam.ztech</text>
+        </g>
+
+        <!-- F5 VIP -->
+        <g class="node" id="n-f5">
+          <rect class="box" x="380" y="304" width="178" height="80" rx="13"/>
+          <path class="ic" d="M400,332 l11,-6 l11,6 l-11,6 z M400,340 l11,6 l11,-6 M400,348 l11,6 l11,-6"/>
+          <text class="nm" x="478" y="334" font-size="13.5">VIp-coop (F5)</text>
+          <text class="role" x="478" y="350" font-size="9.5">relais TCP · L4 · sans SPN</text>
+          <text class="fq" x="478" y="365" font-size="9">VIp-coop.zres.ztech</text>
+        </g>
+
+        <!-- POOL -->
+        <rect class="pool-bg" x="678" y="250" width="244" height="188" rx="14"/>
+        <text class="pool-label" x="700" y="270">POOL DE BACKENDS</text>
+
+        <g class="node" id="n-hostA">
+          <rect class="box" x="700" y="278" width="200" height="62" rx="12"/>
+          <rect class="ic" x="717" y="300" width="20" height="9" rx="2"/>
+          <rect class="ic" x="717" y="312" width="20" height="9" rx="2"/>
+          <text class="nm" x="812" y="304" font-size="12">MachineDest-A</text>
+          <text class="role" x="812" y="319" font-size="9">TermService · porte le SPN</text>
+          <!-- key A glyph -->
+          <g class="keytag" transform="translate(872,326)">
+            <circle r="7" fill="none" stroke="var(--green)" stroke-width="2"/>
+            <path d="M5,0 H16 M12,0 V5 M16,0 V5" stroke="var(--green)" stroke-width="2" fill="none"/>
+          </g>
+        </g>
+
+        <g class="node" id="n-hostB">
+          <rect class="box" x="700" y="350" width="200" height="62" rx="12"/>
+          <rect class="ic" x="717" y="372" width="20" height="9" rx="2"/>
+          <rect class="ic" x="717" y="384" width="20" height="9" rx="2"/>
+          <text class="nm" x="812" y="376" font-size="12">MachineDest-B</text>
+          <text class="role" x="812" y="391" font-size="9">TermService · clé différente</text>
+          <g class="keytag" transform="translate(872,398)">
+            <circle r="7" fill="none" stroke="var(--amber)" stroke-width="2"/>
+            <path d="M5,0 H16 M12,0 V5 M16,0 V5" stroke="var(--amber)" stroke-width="2" fill="none"/>
+          </g>
+        </g>
+
+        <!-- packet -->
+        <circle id="packet" r="5.5" fill="var(--cyan)"/>
+      </svg>
+    </div>
+
+    <!-- PANEL -->
+    <aside class="panel">
+      <div class="step-head"><span class="idx" id="pIdx">01 / 07</span><span class="badge" id="pBadge">—</span></div>
+      <div class="phase" id="pPhase">—</div>
+      <h2 class="lead" id="pLead">—</h2>
+      <div class="key" id="pKey" hidden></div>
+      <div class="tech"><span class="tl">Détail technique</span><p id="pTech">—</p></div>
+      <div class="spacer"></div>
+      <div class="hint">◀ ▶ pour naviguer · Espace pour lire / pause</div>
+    </aside>
+  </main>
+
+  <!-- TIMELINE -->
+  <div class="footer">
+    <div class="ctrls">
+      <button class="cbtn" id="prevBtn" aria-label="Précédent">‹</button>
+      <button class="cbtn play" id="playBtn" aria-label="Lecture/pause">⏸</button>
+      <button class="cbtn" id="nextBtn" aria-label="Suivant">›</button>
+    </div>
+    <div class="track" id="track"></div>
+  </div>
+
+  <!-- ENCRYPTION EXPLAINER -->
+  <section>
+    <div class="sec-h">
+      <span class="tag">Le cœur du problème</span>
+      <h2>La clé qui chiffre le ticket</h2>
+      <span class="sub">choisis un scénario</span>
+    </div>
+    <div class="enc">
+      <div class="enc-top">
+        <p>Kerberos ne chiffre pas la session RDP (ça, c'est TLS/CredSSP). Mais il <b>authentifie au moyen de chiffrement</b>&nbsp;: le KDC chiffre la partie utile du ticket (clé de session + PAC) avec <b>la clé long-terme du compte qui porte le SPN</b>. L'hôte qui reçoit la connexion doit posséder <b>exactement cette clé</b> pour l'ouvrir. La preuve d'identité, côté serveur, <i>est</i> ce déchiffrement. Règle simple&nbsp;: <b>la couleur de la clé qui verrouille doit être identique à celle de la clé qui déverrouille.</b></p>
+      </div>
+      <div class="tabs" id="tabs"></div>
+      <div class="enc-stage" id="encStage">
+        <div class="flow">
+          <!-- locking -->
+          <div class="cell">
+            <div class="lbl">1 · Le KDC verrouille</div>
+            <div class="ticket">
+              <svg class="lock" viewBox="0 0 64 64" id="lockSvg">
+                <path class="shackle" d="M18,28 V22 a14,14 0 0,1 28,0 V28"/>
+                <rect class="body" x="12" y="28" width="40" height="30" rx="7"/>
+                <circle class="hole" cx="32" cy="42" r="4"/>
+                <rect class="hole" x="30" y="42" width="4" height="9" rx="1"/>
+              </svg>
+            </div>
+            <div class="who">Ticket de service</div>
+            <div class="keychip" id="lockKey"><span class="dot"></span><span id="lockKeyTxt">clé —</span></div>
+          </div>
+          <div class="arrow">→</div>
+          <!-- transit -->
+          <div class="cell">
+            <div class="lbl">2 · Le F5 relaie (L4)</div>
+            <div class="who" id="transitWho">vers un backend</div>
+            <div class="sub" id="transitSub">le F5 ne choisit pas selon Kerberos</div>
+          </div>
+          <div class="arrow">→</div>
+          <!-- decrypt verdict -->
+          <div class="vcell" id="vcell" style="--vc:var(--green)">
+            <div class="mark" id="vMark">✓</div>
+            <div class="vtxt" id="vTxt">—</div>
+            <div class="keychip" id="hostKey" style="margin-top:10px"><span class="dot"></span><span id="hostKeyTxt">clé —</span></div>
+            <div class="err" id="vErr"></div>
+            <div class="note" id="vNote"></div>
+          </div>
+        </div>
+        <div class="match-line" id="matchLine"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- THREE BLOCKERS -->
+  <section>
+    <div class="sec-h">
+      <span class="tag">Pourquoi c'est structurel</span>
+      <h2>Trois blocages qui se cumulent</h2>
+    </div>
+    <div class="cards">
+      <div class="card warn">
+        <div class="cn">BLOCAGE 1</div>
+        <h3>Le SPN est unique</h3>
+        <p><code>TERMSRV/VIp-coop.zres.ztech</code> ne peut exister que sur <b>un seul</b> compte de toute la forêt. Même créé, il ne désigne qu'une identité — jamais « le pool ».</p>
+      </div>
+      <div class="card warn">
+        <div class="cn">BLOCAGE 2</div>
+        <h3>Il faut posséder la clé</h3>
+        <p>L'hôte qui <b>répond réellement</b> doit détenir la clé ayant chiffré le ticket. Chaque backend a sa propre clé machine&nbsp;: si le F5 route vers un autre nœud → <code>AP_ERR_MODIFIED</code>.</p>
+      </div>
+      <div class="card warn">
+        <div class="cn">BLOCAGE 3</div>
+        <h3>RDP = identité machine</h3>
+        <p>TermService authentifie les connexions avec le <b>compte d'ordinateur</b> (LocalSystem), pas un compte arbitraire. Aucun moyen supporté de lui faire ouvrir les tickets d'un compte de service ou d'un <b>gMSA</b>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHAT WOULD WORK -->
+  <section>
+    <div class="sec-h">
+      <span class="tag">Les seules issues</span>
+      <h2>Ce qui ferait réellement marcher Kerberos</h2>
+      <span class="sub">… au prix d'un changement de design</span>
+    </div>
+    <div class="cards">
+      <div class="card ok">
+        <div class="cn">OPTION A</div>
+        <h3>Backend unique</h3>
+        <p>On pose <code>TERMSRV/VIp-coop</code> <i>et</i> <code>HOST/VIp-coop</code> sur le compte machine de <b>l'unique</b> hôte (<code>setspn -S</code>). Le ticket pour la VIP devient déchiffrable par ce host.</p>
+        <div class="tradeoff">Compromis : un seul backend — plus de répartition ni de HA.</div>
+      </div>
+      <div class="card alt">
+        <div class="cn">OPTION B</div>
+        <h3>F5 APM + KCD (S4U2Proxy)</h3>
+        <p>Le F5 <b>termine</b> la connexion, pré-authentifie l'utilisateur, puis obtient lui-même un ticket vers le <b>vrai SPN du backend</b> (<code>TERMSRV/MachineDest</code>) au nom de l'utilisateur, via délégation contrainte.</p>
+        <div class="tradeoff">Compromis : fini le L4 pur et le CredSSP de bout en bout.</div>
+      </div>
+      <div class="card alt">
+        <div class="cn">OPTION C</div>
+        <h3>RD Connection Broker</h3>
+        <p>La brique native Microsoft&nbsp;: le client est redirigé vers l'hôte de session <b>réel</b>, et Kerberos s'opère contre le vrai nom de cet hôte, pas contre la VIP.</p>
+        <div class="tradeoff">Compromis : ce n'est plus un simple VIP L4 sur F5.</div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span>CA-GIP · schéma pédagogique — authentification RDP</span>
+    <span>Kerberos exige que le nom appelé corresponde à une clé déchiffrable par l'hôte qui répond.</span>
+  </footer>
+</div>
+
+<script>
+/* ===================== STEPPER DATA ===================== */
+const TONES={cyan:'var(--cyan)',violet:'var(--violet)',gold:'var(--gold)',red:'var(--red)',green:'var(--green)'};
+const ALLNODES=['n-client','n-f5','n-kdc','n-hostA','n-hostB'];
+const ALLLINKS=['lk-kerb','lk-tgs','lk-tcp','lk-fwd'];
+const ALLANNO=['an-port','an-search','an-unknown','an-lock','an-modified','an-route'];
+
+const STEPS=[
+ { tone:'cyan', badge:'Requête', phase:'Client → KDC · port 88',
+   lead:`SSPI demande au KDC un ticket de service pour le SPN <code>TERMSRV/VIp-coop</code>.`,
+   tech:`L'échange Kerberos passe sur le port <code>88</code>, sur un canal distinct du tunnel RDP qui, lui, traverse le F5. Le client demande : « je veux parler à <code>TERMSRV/VIp-coop.zres.ztech</code> ».`,
+   nodes:['n-client','n-kdc'], links:['lk-kerb'], anno:['an-port'], packet:{path:'pp-kerb',rev:false} },
+
+ { tone:'gold', badge:'Recherche', phase:'KDC · résolution du SPN',
+   lead:`Le KDC cherche : quel compte de l'annuaire porte ce SPN&nbsp;?`,
+   tech:`Le KDC interroge l'attribut <code>servicePrincipalName</code> des comptes. C'est ce compte — et lui seul — dont la clé long-terme servira à chiffrer le ticket. Tout dépend donc de l'existence et de l'emplacement du SPN.`,
+   nodes:['n-kdc'], links:[], anno:['an-search'], packet:{path:'pp-kerb',rev:false} },
+
+ { tone:'red', badge:'Cas 1 — absent', phase:'Aucun compte ne porte le SPN',
+   lead:`Si <b>aucun</b> compte ne porte le SPN, le KDC n'émet rien du tout.`,
+   tech:`Résultat <code>KRB5KDC_ERR_S_PRINCIPAL_UNKNOWN</code>, renvoyé par le KDC <b>avant toute émission</b> : il ne sait même pas avec quelle clé chiffrer, le principal n'existe pas. Il n'y a donc aucun ticket — rien à déchiffrer plus loin.`,
+   key:{type:'warn',html:`<b>Point clé</b> — sans SPN, Kerberos s'arrête ici, côté KDC. Aucun ticket n'existe.`},
+   nodes:['n-kdc','n-client'], links:['lk-kerb'], anno:['an-unknown'], packet:{path:'pp-kerb',rev:true} },
+
+ { tone:'violet', badge:'Cas 2 — chiffrement', phase:'KDC · le ticket est verrouillé',
+   lead:`Si un compte porte le SPN, le KDC chiffre le ticket avec <b>la clé de ce compte</b>.`,
+   tech:`La <i>enc-part</i> du ticket (clé de session + PAC) est chiffrée avec la clé long-terme du compte porteur. C'est un verrou : seul qui possède la même clé pourra l'ouvrir. Le KDC renvoie ce ticket au client.`,
+   key:{type:'',html:`<b>Point clé</b> — le ticket est « scellé » à la clé d'<i>un</i> compte précis. Retiens cette couleur de clé.`},
+   nodes:['n-kdc','n-client'], links:['lk-tgs'], anno:['an-lock'], packet:{path:'pp-tgs',rev:false} },
+
+ { tone:'cyan', badge:'Présentation', phase:'Client → F5 (L4) → backend',
+   lead:`Le client présente le ticket. Le F5 relaie les octets vers <b>un</b> backend du pool.`,
+   tech:`Le F5 est en pur niveau 4 : il choisit un backend selon la persistance réseau (source-address), <b>pas</b> selon le SPN ni l'identité Kerberos. L'hôte qui reçoit doit maintenant ouvrir le ticket avec sa propre clé machine.`,
+   nodes:['n-client','n-f5','n-hostA','n-hostB'], links:['lk-tcp','lk-fwd'], anno:['an-route'], packet:{path:'pp-spine',rev:false} },
+
+ { tone:'red', badge:'Échec', phase:'Clé ≠ → déchiffrement impossible',
+   lead:`Le backend qui répond n'est pas celui dont la clé a chiffré le ticket. <b>Clé ≠</b>.`,
+   tech:`Le SPN étant unique, il vit sur <i>un</i> compte machine. Si le F5 a routé vers un autre nœud, sa clé diffère → il ne peut pas déchiffrer → <code>KRB5KRB_AP_ERR_MODIFIED</code>. Et un gMSA n'y change rien : RDP ouvre avec l'identité <b>machine</b>, pas celle du gMSA.`,
+   key:{type:'warn',html:`<b>Point clé</b> — c'est exactement le symptôme « SPN sur le mauvais compte ». Le nom appelé ne correspond pas à une clé que l'hôte possède.`},
+   nodes:['n-hostA','n-hostB'], links:['lk-fwd'], anno:['an-modified'], packet:{path:'pp-spine',rev:false}, bad:['n-hostB'] },
+
+ { tone:'red', badge:'Conclusion', phase:'Verdict',
+   lead:`Derrière une VIP L4 + pool, Kerberos ne peut pas aboutir de façon supportée.`,
+   tech:`Ni un SPN sur la VIP (unique → un seul hôte), ni un compte de service / gMSA (RDP = identité machine) ne résolvent le problème. Pour avoir Kerberos, il faut changer le design : backend unique, passerelle APM + KCD, ou RD Connection Broker. Sinon, le repli NTLMv2 reste la voie qui fonctionne.`,
+   key:{type:'warn',html:`<b>✗ Non applicable.</b> Voir « Les seules issues » plus bas.`},
+   nodes:[], links:[], anno:[], packet:{path:'pp-spine',rev:false} },
+];
+const SHORT=['Requête','Recherche','Absent','Chiffrement','Présentation','Échec','Verdict'];
+
+/* ===================== STATE & ELEMENTS ===================== */
+let i=0, playing=true, timer=null, rafId=null;
+const app=document.getElementById('app');
+const svg=document.getElementById('map');
+const packet=document.getElementById('packet');
+const panel=document.querySelector('.panel');
+const DUR=5200;
+
+/* timeline */
+const track=document.getElementById('track');
+SHORT.forEach((s,idx)=>{
+  const seg=document.createElement('button');
+  seg.className='seg'; seg.innerHTML='<span class="sn">0'+(idx+1)+'</span><span class="sl">'+s+'</span>';
+  seg.addEventListener('click',()=>{ go(idx); pause(); });
+  track.appendChild(seg);
+});
+const segs=[...track.children];
+
+/* packet animation */
+function runPacket(pathId,reverse,color){
+  cancelAnimationFrame(rafId);
+  const path=document.getElementById(pathId);
+  if(!path){ packet.style.opacity=0; return; }
+  const len=path.getTotalLength();
+  packet.setAttribute('fill',color); packet.style.color=color;
+  let start=null; const cyc=1700;
+  function frame(ts){
+    if(start===null) start=ts;
+    const t=((ts-start)%cyc)/cyc;
+    const d=reverse?(1-t):t;
+    const p=path.getPointAtLength(d*len);
+    packet.setAttribute('cx',p.x.toFixed(1));
+    packet.setAttribute('cy',p.y.toFixed(1));
+    const edge=Math.min(t,1-t);
+    packet.style.opacity=Math.min(1,edge*7+0.12).toFixed(2);
+    rafId=requestAnimationFrame(frame);
+  }
+  rafId=requestAnimationFrame(frame);
+}
+
+/* render */
+function render(){
+  const s=STEPS[i];
+  const tone=TONES[s.tone];
+  svg.style.setProperty('--tone',tone);
+  panel.style.setProperty('--tone',tone);
+
+  document.getElementById('pIdx').textContent='0'+(i+1)+' / 07';
+  const badge=document.getElementById('pBadge'); badge.textContent=s.badge; badge.style.setProperty('--tone',tone);
+  document.getElementById('pPhase').textContent=s.phase;
+  document.getElementById('pLead').innerHTML=s.lead;
+  document.getElementById('pTech').innerHTML=s.tech;
+  const k=document.getElementById('pKey');
+  if(s.key){ k.hidden=false; k.className='key '+(s.key.type||''); k.innerHTML=s.key.html; } else { k.hidden=true; }
+
+  ALLNODES.forEach(n=>{
+    const el=document.getElementById(n);
+    el.classList.toggle('on',s.nodes.includes(n));
+    el.classList.toggle('dim',!s.nodes.includes(n));
+    el.classList.toggle('bad',!!(s.bad&&s.bad.includes(n)));
+    el.classList.toggle('good',!!(s.good&&s.good.includes(n)));
+  });
+  ALLLINKS.forEach(l=>document.getElementById(l).classList.toggle('on',s.links.includes(l)));
+  ALLANNO.forEach(a=>document.getElementById(a).classList.toggle('show',s.anno.includes(a)));
+
+  runPacket(s.packet.path,s.packet.rev,tone);
+
+  segs.forEach((seg,idx)=>{ seg.classList.toggle('active',idx===i); seg.classList.toggle('done',idx<i); if(idx===i) seg.style.setProperty('--tone',tone); });
+}
+
+/* nav */
+function go(n){ i=(n+STEPS.length)%STEPS.length; render(); schedule(); }
+function next(){ go(i+1); } function prev(){ go(i-1); }
+function schedule(){ clearTimeout(timer); if(playing) timer=setTimeout(()=>go(i+1),DUR); }
+function setPlay(v){ playing=v; document.getElementById('playBtn').textContent=playing?'⏸':'▶'; schedule(); }
+function pause(){ setPlay(false); }
+document.getElementById('nextBtn').onclick=()=>{ next(); pause(); };
+document.getElementById('prevBtn').onclick=()=>{ prev(); pause(); };
+document.getElementById('playBtn').onclick=()=>setPlay(!playing);
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'){ next(); pause(); e.preventDefault(); }
+  else if(e.key==='ArrowLeft'){ prev(); pause(); e.preventDefault(); }
+  else if(e.key===' '){ setPlay(!playing); e.preventDefault(); }
+});
+
+/* toggles */
+document.getElementById('techBtn').onclick=function(){ app.classList.toggle('show-tech'); this.classList.toggle('on',app.classList.contains('show-tech')); };
+document.getElementById('themeBtn').onclick=()=>{ const r=document.documentElement; r.dataset.theme = r.dataset.theme==='dark'?'light':'dark'; render(); };
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) clearTimeout(timer); else schedule(); });
+
+/* ===================== ENCRYPTION EXPLAINER ===================== */
+const SCEN=[
+ { id:'mono', tab:'Backend unique', pass:true,
+   lockKey:['var(--green)','clé : compte machine MachineDest'],
+   hostKey:['var(--green)','clé : même compte machine'],
+   transit:['vers l\'unique hôte','le seul du « pool »'],
+   mark:'✓', txt:'Le host déchiffre le ticket', err:'', vc:'var(--green)',
+   note:'Le SPN est posé sur le compte machine de cet hôte unique : il possède la clé qui a verrouillé.',
+   match:'<b>clé du verrou</b> <span class="eq">=</span> <b>clé de l\'hôte</b> → ticket ouvert' },
+
+ { id:'pool', tab:'Pool L4 (votre cas)', pass:false,
+   lockKey:['var(--green)','clé : MachineDest-A (porte le SPN)'],
+   hostKey:['var(--amber)','clé : MachineDest-B (a répondu)'],
+   transit:['vers un backend du pool','persistance réseau, pas Kerberos'],
+   mark:'✗', txt:'L\'hôte ne peut pas déchiffrer', err:'KRB5KRB_AP_ERR_MODIFIED', vc:'var(--red)',
+   note:'Le SPN, unique, vit sur A. Mais le F5 a relayé vers B, dont la clé machine diffère.',
+   match:'<b>clé du verrou (A)</b> <span class="neq">≠</span> <b>clé de l\'hôte (B)</b> → échec' },
+
+ { id:'gmsa', tab:'gMSA / compte de service', pass:false,
+   lockKey:['var(--violet)','clé : compte gMSA / de service'],
+   hostKey:['var(--green)','clé : compte machine (LocalSystem)'],
+   transit:['vers le backend','TermService tourne en LocalSystem'],
+   mark:'✗', txt:'TermService ouvre avec la clé machine', err:'clés incompatibles', vc:'var(--red)',
+   note:'Le KDC chiffrerait avec la clé du gMSA, mais RDP authentifie avec l\'identité machine. Le gMSA ne sauve pas RDP.',
+   match:'<b>clé du verrou (gMSA)</b> <span class="neq">≠</span> <b>clé machine</b> → échec' },
+
+ { id:'nospn', tab:'Aucun SPN', pass:false,
+   lockKey:['var(--ink3)','aucune clé — pas de verrou'],
+   hostKey:['var(--ink3)','— rien à ouvrir'],
+   transit:['—','le KDC n\'a rien émis'],
+   mark:'∅', txt:'Aucun ticket n\'est émis', err:'KRB5KDC_ERR_S_PRINCIPAL_UNKNOWN', vc:'var(--amber)',
+   note:'Le principal n\'existe pas : le KDC refuse en amont. Il n\'y a pas de ticket, donc rien à déchiffrer.',
+   match:'pas de SPN → <b>pas de ticket</b> → SSPI bascule (NTLMv2)' },
+];
+
+const tabsEl=document.getElementById('tabs');
+const encStage=document.getElementById('encStage');
+SCEN.forEach((sc,idx)=>{
+  const b=document.createElement('button');
+  b.className='tab '+(sc.pass?'pass':'fail'); b.textContent=sc.tab; b.dataset.i=idx;
+  b.onclick=()=>setScen(idx);
+  tabsEl.appendChild(b);
+});
+const tabBtns=[...tabsEl.children];
+
+function setScen(idx){
+  const sc=SCEN[idx];
+  tabBtns.forEach((b,k)=>b.classList.toggle('on',k===idx));
+  // lock
+  document.getElementById('lockSvg').style.setProperty('--kc',sc.lockKey[0]);
+  document.getElementById('lockKey').style.setProperty('--kc',sc.lockKey[0]);
+  document.getElementById('lockKeyTxt').textContent=sc.lockKey[1];
+  // transit
+  document.getElementById('transitWho').textContent=sc.transit[0];
+  document.getElementById('transitSub').textContent=sc.transit[1];
+  // verdict
+  const v=document.getElementById('vcell'); v.style.setProperty('--vc',sc.vc);
+  document.getElementById('vMark').textContent=sc.mark;
+  document.getElementById('vTxt').textContent=sc.txt;
+  document.getElementById('hostKey').style.setProperty('--kc',sc.hostKey[0]);
+  document.getElementById('hostKeyTxt').textContent=sc.hostKey[1];
+  document.getElementById('vErr').textContent=sc.err;
+  document.getElementById('vNote').textContent=sc.note;
+  document.getElementById('matchLine').innerHTML=sc.match;
+  // lock open / fail animation
+  encStage.dataset.open=sc.pass?'1':'0';
+  encStage.dataset.fail='0';
+  if(!sc.pass && sc.id!=='nospn'){ void encStage.offsetWidth; encStage.dataset.fail='1'; }
+}
+
+/* ===================== INIT ===================== */
+render(); setPlay(true); setScen(1);
+</script>
+</body>
+</html>
