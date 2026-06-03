@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pourquoi Kerberos ne s'applique pas — VIp-coop · F5 (L4)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ================= TOKENS ================= */
+:root{
+  --bg:#F3F7F5; --bg2:#EBF1EE; --panel:#FFFFFF; --panel2:#F5FAF7; --panel3:#EAF2ED;
+  --line:#CAE0D4; --line2:#B2CFC2; --line3:#8FB5A5;
+  --ink:#10261E; --ink2:#375E50; --ink3:#6F9885;
+  --gold:#00843D; --cyan:#005A38; --violet:#3D6FA8; --green:#186C35; --red:#C23030; --amber:#B26A0C;
+  --tone:var(--cyan);
+  --grid:rgba(0,90,56,.028);
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --sans:'Open Sans',system-ui,sans-serif;
+  --shadow:0 4px 22px -8px rgba(0,90,56,.16);
+}
+[data-theme="dark"]{
+  --bg:#0C1714; --bg2:#0F1C18; --panel:#12211C; --panel2:#16271F; --panel3:#1B2F26;
+  --line:#284A3C; --line2:#356152; --line3:#4E8270;
+  --ink:#EAF3EE; --ink2:#A8C7B9; --ink3:#6F9885;
+  --gold:#1FBF66; --cyan:#37C98C; --violet:#6FA3DC; --green:#37C98C; --red:#E5736B; --amber:#D69838;
+  --grid:rgba(0,168,79,.05);
+  --shadow:0 12px 34px -14px rgba(0,0,0,.65);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; color:var(--ink); background:
+    radial-gradient(900px 500px at 85% -10%, color-mix(in srgb,var(--gold) 9%,transparent), transparent 60%),
+    linear-gradient(180deg,var(--bg2),var(--bg));
+  background-attachment:fixed;
+  font-family:var(--sans); font-size:15px; line-height:1.55;
+  -webkit-font-smoothing:antialiased; overflow-x:hidden;
+}
+::selection{background:var(--cyan);color:#fff}
+.app{display:flex;flex-direction:column;min-height:100vh}
+
+/* ---- HEADER ---- */
+header{
+  display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+  padding:14px 24px;border-bottom:1px solid #004538;background:#00594F;
+}
+.brand{display:flex;align-items:center;gap:13px;margin-right:auto;min-width:0}
+.brand .mk{width:30px;height:30px;border-radius:8px;flex:0 0 auto;position:relative;
+  background:radial-gradient(circle at 30% 30%,#00A84F,#003828);
+  box-shadow:0 0 0 4px rgba(0,168,79,.22),0 0 18px rgba(0,168,79,.28)}
+.brand .mk::before{content:"CA";position:absolute;inset:0;display:grid;place-items:center;
+  font-family:var(--sans);font-weight:800;font-size:10.5px;color:#fff;letter-spacing:.06em}
+.brand h1{font-weight:800;font-size:16px;letter-spacing:.01em;margin:0;line-height:1.12;color:#fff}
+.brand small{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.70);margin-top:2px}
+.verdict{font-family:var(--mono);font-size:12px;display:flex;gap:8px;align-items:center;
+  border:1px solid rgba(255,255,255,.30);border-radius:999px;padding:6px 14px;background:rgba(255,255,255,.10);white-space:nowrap;color:#fff}
+.verdict .x{color:#FFC9C4;font-weight:600} .verdict .sep{color:rgba(255,255,255,.44)}
+.tools{display:flex;gap:9px;flex-wrap:wrap}
+.tbtn{font-family:var(--mono);font-size:12px;cursor:pointer;border:1px solid rgba(255,255,255,.27);background:rgba(255,255,255,.09);
+  color:rgba(255,255,255,.82);border-radius:9px;padding:8px 13px;display:inline-flex;gap:8px;align-items:center;transition:.16s;white-space:nowrap}
+.tbtn:hover{border-color:rgba(255,255,255,.60);color:#fff;background:rgba(255,255,255,.17)}
+.tbtn.on{border-color:#fff;color:#fff;background:rgba(255,255,255,.22)}
+
+/* ---- INTRO STRIP ---- */
+.intro{max-width:1200px;margin:0 auto;padding:16px 24px 4px;width:100%}
+.intro p{margin:0;color:var(--ink2);font-size:14px;max-width:80ch}
+.intro b{color:var(--ink)}
+.intro code{font-family:var(--mono);font-size:.9em;color:var(--gold);background:color-mix(in srgb,var(--gold) 12%,transparent);border-radius:5px;padding:1px 6px}
+
+/* ---- MAIN (map) ---- */
+main{display:grid;grid-template-columns:1fr 372px;gap:0;max-width:1200px;width:100%;margin:14px auto 0;
+  border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--panel);box-shadow:var(--shadow)}
+.stage{position:relative;min-width:0;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:16px 18px;
+  background-image:radial-gradient(var(--grid) 1px,transparent 1px);background-size:22px 22px}
+.stage svg{width:100%;height:auto;max-height:520px;display:block}
+
+/* ---- SVG map ---- */
+.box{fill:var(--panel);stroke:var(--line2);stroke-width:1.4;transition:.35s}
+.node .nm{fill:var(--ink);font-family:var(--sans);font-weight:700;text-anchor:middle}
+.node .role{fill:var(--ink3);font-family:var(--mono);text-anchor:middle}
+.node .fq{fill:var(--ink3);font-family:var(--mono);text-anchor:middle;opacity:.8}
+.node .ic{stroke:var(--ink2);fill:none;stroke-width:1.5}
+.node.on .box{stroke:var(--tone);stroke-width:2.2;filter:drop-shadow(0 4px 12px color-mix(in srgb,var(--tone) 30%,transparent))}
+.node.on .nm{fill:var(--ink)}
+.node.dim{opacity:.34;transition:.35s}
+.node.bad .box{stroke:var(--red);stroke-width:2.4}
+.node.good .box{stroke:var(--green);stroke-width:2.4}
+.pool-bg{fill:color-mix(in srgb,var(--gold) 5%,transparent);stroke:var(--line2);stroke-width:1.2;stroke-dasharray:5 4;rx:14}
+.pool-label{fill:var(--ink3);font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase}
+.link{stroke:var(--line3);stroke-width:1.6;fill:none;opacity:.5;transition:.35s}
+.link.on{stroke:var(--tone);stroke-width:2.4;opacity:1;stroke-dasharray:7 6;animation:flow 1s linear infinite}
+.link.bad.on{stroke:var(--red)}
+@keyframes flow{to{stroke-dashoffset:-26}}
+.anno{fill:var(--ink3);font-family:var(--mono);font-size:10px;text-anchor:middle;opacity:0;transition:.3s}
+.anno.show{opacity:1}
+.anno.err{fill:var(--red);font-weight:600}
+.anno.ok{fill:var(--green);font-weight:600}
+.keytag{transition:.35s}
+#packet{filter:drop-shadow(0 0 6px currentColor);transition:fill .3s}
+
+/* ---- PANEL ---- */
+.panel{border-left:1px solid var(--line);background:linear-gradient(180deg,var(--panel),var(--bg2));
+  padding:22px 22px 18px;display:flex;flex-direction:column;gap:14px;min-height:520px}
+.step-head{display:flex;align-items:center;gap:12px}
+.idx{font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.1em}
+.badge{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;
+  padding:5px 12px;border-radius:999px;border:1px solid var(--tone);color:var(--tone);
+  background:color-mix(in srgb,var(--tone) 12%,transparent);transition:.3s}
+.phase{font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.16em;text-transform:uppercase}
+.lead{font-weight:700;font-size:20px;line-height:1.24;margin:0;letter-spacing:-.01em;color:var(--ink)}
+.lead code{font-family:var(--mono);font-size:.82em;color:var(--gold);background:color-mix(in srgb,var(--gold) 13%,transparent);border-radius:5px;padding:1px 5px}
+.key{border-left:3px solid var(--tone);background:color-mix(in srgb,var(--tone) 9%,transparent);
+  border-radius:0 10px 10px 0;padding:11px 14px;font-size:13.5px;color:var(--ink)}
+.key.warn{--tone:var(--red)} .key.ok{--tone:var(--green)}
+.key b{color:var(--tone)} .key code{font-family:var(--mono);font-size:.86em}
+.tech{border:1px solid var(--line2);border-radius:12px;padding:13px 15px;background:var(--panel2)}
+.tech .tl{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);display:flex;gap:8px;align-items:center;margin-bottom:7px}
+.tech .tl::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--gold)}
+.tech p{margin:0;font-family:var(--mono);font-size:12.3px;line-height:1.6;color:var(--ink2)}
+.tech code{font-family:var(--mono);color:var(--gold)}
+.app:not(.show-tech) .tech{display:none}
+.spacer{flex:1 1 auto}
+.hint{font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.04em}
+
+/* ---- TIMELINE ---- */
+.footer{max-width:1200px;width:100%;margin:0 auto;display:flex;align-items:center;gap:14px;padding:14px 4px 2px}
+.ctrls{display:flex;gap:7px;flex:0 0 auto}
+.cbtn{width:40px;height:40px;cursor:pointer;border:1px solid var(--line2);background:var(--panel);color:var(--ink);
+  border-radius:10px;font-size:16px;display:grid;place-items:center;transition:.15s}
+.cbtn:hover{border-color:var(--gold);color:var(--gold)}
+.cbtn.play{background:var(--cyan);color:#fff;border-color:var(--cyan)}
+.cbtn.play:hover{filter:brightness(1.12)}
+.track{display:flex;gap:6px;flex:1 1 auto;min-width:0}
+.seg{flex:1 1 0;min-width:0;cursor:pointer;border:1px solid var(--line2);background:var(--panel);
+  border-radius:9px;padding:8px 9px;display:flex;flex-direction:column;gap:3px;transition:.18s}
+.seg:hover{border-color:var(--line3)}
+.seg .sn{font-family:var(--mono);font-size:10px;color:var(--ink3);letter-spacing:.06em}
+.seg .sl{font-family:var(--mono);font-size:11px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.seg.done{background:var(--panel2)}
+.seg.active{border-color:var(--tone);background:color-mix(in srgb,var(--tone) 13%,transparent)}
+
+/* ================= SECTIONS ================= */
+section{max-width:1200px;width:100%;margin:30px auto 0;padding:0 4px}
+.sec-h{display:flex;align-items:baseline;gap:13px;flex-wrap:wrap;margin-bottom:16px}
+.sec-h .tag{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+  color:#fff;background:var(--cyan);border-radius:6px;padding:4px 9px;font-weight:600}
+.sec-h h2{font-weight:800;font-size:22px;margin:0;letter-spacing:-.01em;color:var(--ink)}
+.sec-h .sub{font-family:var(--mono);font-size:11.5px;color:var(--ink3);margin-left:auto}
+
+/* ---- ENCRYPTION EXPLAINER ---- */
+.enc{border:1px solid var(--line);border-radius:16px;background:var(--panel);box-shadow:var(--shadow);overflow:hidden}
+.enc-top{padding:18px 22px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,var(--panel2),transparent)}
+.enc-top p{margin:0;color:var(--ink2);font-size:14px;max-width:90ch}
+.enc-top b{color:var(--ink)}
+.enc-top code{font-family:var(--mono);font-size:.9em;color:var(--gold);background:color-mix(in srgb,var(--gold) 12%,transparent);border-radius:5px;padding:1px 6px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;padding:16px 22px 0}
+.tab{font-family:var(--mono);font-size:12px;cursor:pointer;border:1px solid var(--line2);background:var(--panel2);
+  color:var(--ink2);border-radius:9px 9px 0 0;padding:9px 14px;transition:.16s;border-bottom:none;position:relative;top:1px}
+.tab:hover{color:var(--ink)}
+.tab.on{color:var(--ink);background:var(--panel);border-color:var(--line);font-weight:600}
+.tab.on.fail{box-shadow:inset 0 -3px 0 var(--red)} .tab.on.pass{box-shadow:inset 0 -3px 0 var(--green)}
+.enc-stage{padding:26px 22px 30px;border-top:1px solid var(--line)}
+.flow{display:grid;grid-template-columns:1fr auto 1fr auto 1.1fr;gap:14px;align-items:center}
+@media(max-width:860px){.flow{grid-template-columns:1fr;gap:18px}.arrow{transform:rotate(90deg)}}
+.cell{border:1px solid var(--line2);border-radius:14px;padding:16px;background:var(--panel2);text-align:center}
+.cell .lbl{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink3);margin-bottom:10px}
+.cell .who{font-weight:700;font-size:14px;color:var(--ink);margin-bottom:3px}
+.cell .sub{font-family:var(--mono);font-size:11px;color:var(--ink3)}
+.arrow{color:var(--ink3);font-size:22px;text-align:center}
+
+/* lock + ticket */
+.ticket{position:relative;display:inline-flex;flex-direction:column;align-items:center;gap:9px;margin-bottom:6px}
+.lock{width:62px;height:62px}
+.lock .body{fill:color-mix(in srgb,var(--kc) 16%,var(--panel));stroke:var(--kc);stroke-width:2.4;transition:.4s}
+.lock .shackle{fill:none;stroke:var(--kc);stroke-width:5;stroke-linecap:round;transform-origin:32px 24px;transition:transform .45s cubic-bezier(.3,1.4,.5,1),stroke .4s}
+.lock .hole{fill:var(--kc);transition:.4s}
+.enc-stage[data-open="1"] .lock .shackle{transform:rotate(-26deg) translateX(-5px)}
+.enc-stage[data-fail="1"] .lock{animation:shake .5s}
+@keyframes shake{10%,90%{transform:translateX(-1px)}20%,80%{transform:translateX(2px)}30%,50%,70%{transform:translateX(-4px)}40%,60%{transform:translateX(4px)}}
+.keychip{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:12px;color:var(--ink);
+  border:1px solid var(--line2);border-radius:999px;padding:6px 12px;background:var(--panel)}
+.keychip .dot{width:12px;height:12px;border-radius:3px;background:var(--kc);box-shadow:0 0 0 3px color-mix(in srgb,var(--kc) 22%,transparent)}
+.keyglyph{width:16px;height:16px;color:var(--kc)}
+
+/* verdict cell */
+.vcell{border-radius:14px;padding:18px 16px;text-align:center;border:1.5px solid var(--vc);background:color-mix(in srgb,var(--vc) 8%,var(--panel))}
+.vcell .mark{font-size:30px;line-height:1;margin-bottom:8px;color:var(--vc)}
+.vcell .vtxt{font-weight:700;font-size:15px;color:var(--ink)}
+.vcell .err{font-family:var(--mono);font-size:11.5px;color:var(--vc);margin-top:6px;font-weight:600}
+.vcell .note{font-size:12.5px;color:var(--ink2);margin-top:8px}
+.match-line{text-align:center;margin-top:20px;font-family:var(--mono);font-size:12.5px;color:var(--ink2)}
+.match-line b{color:var(--ink)}
+.match-line .eq{color:var(--green);font-weight:700} .match-line .neq{color:var(--red);font-weight:700}
+
+/* ---- CARD GRIDS ---- */
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:860px){.cards{grid-template-columns:1fr}}
+.card{border:1px solid var(--line);border-radius:14px;padding:18px;background:var(--panel);box-shadow:var(--shadow);position:relative;overflow:hidden}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--cc,var(--cyan))}
+.card .cn{font-family:var(--mono);font-size:11px;color:var(--cc,var(--cyan));font-weight:600;letter-spacing:.08em}
+.card h3{font-size:15.5px;margin:6px 0 8px;color:var(--ink);font-weight:700}
+.card p{margin:0;font-size:13.5px;color:var(--ink2);line-height:1.55}
+.card code{font-family:var(--mono);font-size:.88em;color:var(--gold);background:color-mix(in srgb,var(--gold) 12%,transparent);border-radius:5px;padding:1px 5px}
+.card.warn{--cc:var(--red)} .card.ok{--cc:var(--green)} .card.alt{--cc:var(--violet)}
+.card .tradeoff{margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--ink3);border-top:1px dashed var(--line2);padding-top:9px}
+
+footer.foot{max-width:1200px;width:100%;margin:34px auto 30px;padding:16px 4px 0;border-top:1px solid var(--line);
+  font-family:var(--mono);font-size:11px;color:var(--ink3);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+
+/* ---- WIRESHARK ---- */
+.lead-note{border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:var(--shadow);padding:18px 22px;margin-bottom:16px}
+.lead-note p{margin:0;color:var(--ink2);font-size:14px;line-height:1.62}
+.lead-note p+p{margin-top:10px}
+.lead-note b{color:var(--ink)}
+.lead-note .warn{color:var(--red);font-weight:600}
+.lead-note code{font-family:var(--mono);font-size:.9em;color:var(--gold);background:color-mix(in srgb,var(--gold) 12%,transparent);border-radius:5px;padding:1px 6px}
+.pcap{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--panel);box-shadow:var(--shadow)}
+.pcap-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--panel3);border-bottom:1px solid var(--line)}
+.pcap-bar .ttl{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);white-space:nowrap}
+.pcap-bar .flt{flex:1;min-width:0;background:color-mix(in srgb,var(--green) 8%,var(--panel));border:1px solid var(--line2);border-radius:7px;padding:6px 10px;color:var(--green);font-family:var(--mono);font-size:12px;display:flex;align-items:center;gap:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pcap-bar .flt::before{content:"⌕";color:var(--ink3)}
+.ptbl-wrap{overflow-x:auto}
+.ptbl{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11.5px;min-width:760px}
+.ptbl th{text-align:left;padding:8px 10px;background:var(--panel2);color:var(--ink3);font-weight:600;border-bottom:1px solid var(--line);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.ptbl td{padding:6px 10px;border-bottom:1px solid var(--line);color:var(--ink2);white-space:nowrap}
+.ptbl td.info{white-space:normal;color:var(--ink)}
+.ptbl tr:hover td{filter:brightness(.985)}
+.ptbl .no{color:var(--ink3)}
+.ptbl tr.tcp td{background:color-mix(in srgb,var(--ink3) 8%,transparent)}
+.ptbl tr.tls td{background:color-mix(in srgb,var(--violet) 8%,transparent)}
+.ptbl tr.krb td{background:color-mix(in srgb,var(--gold) 11%,transparent)}
+.ptbl tr.err td{background:color-mix(in srgb,var(--red) 15%,transparent);font-weight:600}
+.ptbl tr.err td.info{color:var(--red)}
+.ptbl tr.hot td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
+.ptbl tr.err.hot td:first-child{box-shadow:inset 3px 0 0 var(--red)}
+.ptbl tr.sep td{background:var(--panel3);color:var(--ink3);font-style:italic;text-align:center;letter-spacing:.04em;padding:5px 10px}
+.proto{font-weight:700}
+.proto.tcp{color:var(--ink3)} .proto.rdp{color:var(--cyan)} .proto.tls{color:var(--violet)} .proto.krb{color:var(--gold)} .proto.err{color:var(--red)}
+.pcap-legend{display:flex;gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:10.5px;color:var(--ink3);padding:11px 16px;border-top:1px dashed var(--line2)}
+.pcap-legend span{display:inline-flex;align-items:center;gap:6px}
+.pcap-legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.pcap-note{padding:13px 16px;border-top:1px solid var(--line);font-size:12.6px;color:var(--ink2);background:var(--panel2);line-height:1.6}
+.pcap-note b{color:var(--ink)} .pcap-note .hl{color:var(--red);font-weight:600}
+.pcap-note code{font-family:var(--mono);font-size:.9em;color:var(--gold)}
+.fbox{font-family:var(--mono);font-size:12.5px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:16px 18px;color:var(--ink);line-height:2;margin-top:16px;overflow-x:auto}
+.fbox .f{color:var(--green)} .fbox .c{color:var(--ink3)} .fbox .warnf{color:var(--amber)}
+.subh{font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink3);margin:22px 0 12px}
+.qabox{border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:0 14px 14px 0;background:color-mix(in srgb,var(--gold) 7%,var(--panel));box-shadow:var(--shadow);padding:16px 20px;margin-bottom:16px}
+.qabox .q{font-weight:800;font-size:16px;color:var(--ink);margin:0 0 9px;letter-spacing:-.01em}
+.qabox p{margin:0;color:var(--ink2);font-size:14px;line-height:1.62}
+.qabox p+p{margin-top:9px}
+.qabox b{color:var(--ink)} .qabox .em{color:var(--gold);font-weight:700}
+.qabox code{font-family:var(--mono);font-size:.88em;color:var(--gold);background:color-mix(in srgb,var(--gold) 12%,transparent);border-radius:5px;padding:1px 6px}
+
+/* ---- WIRESHARK : extra rows (backend side) ---- */
+.ptbl tr.ldap td{background:color-mix(in srgb,var(--violet) 8%,transparent)}
+.ptbl tr.nrpc td{background:color-mix(in srgb,var(--amber) 11%,transparent)}
+.ptbl tr.dns  td{background:color-mix(in srgb,var(--ink3) 7%,transparent)}
+.ptbl tr.okk  td{background:color-mix(in srgb,var(--green) 13%,transparent)}
+.ptbl tr.okk td.info{color:var(--green);font-weight:600}
+.ptbl tr.okk.hot td:first-child{box-shadow:inset 3px 0 0 var(--green)}
+.proto.ldap{color:var(--violet)} .proto.nrpc{color:var(--amber)} .proto.dns{color:var(--ink3)} .proto.ok{color:var(--green)} .proto.nla{color:var(--cyan)}
+.pcap.alt .pcap-bar{background:color-mix(in srgb,var(--violet) 9%,var(--panel3))}
+.cap-where{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#fff;background:var(--violet);border-radius:6px;padding:4px 9px;font-weight:600;white-space:nowrap}
+.cap-where.client{background:var(--cyan)}
+
+/* ---- TWO COLOR SCHEMAS ---- */
+.schemas{display:grid;grid-template-columns:1fr;gap:18px}
+.schema-card{border:1px solid var(--line);border-radius:16px;background:var(--panel);box-shadow:var(--shadow);overflow:hidden}
+.schema-card .sh-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 20px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,var(--panel2),transparent)}
+.schema-card .sh-top h3{margin:0;font-size:16px;font-weight:800;color:var(--ink);letter-spacing:-.01em}
+.schema-card .sh-top .verdict-chip{font-family:var(--mono);font-size:11px;letter-spacing:.08em;border-radius:999px;padding:5px 12px;font-weight:600;white-space:nowrap;border:1px solid}
+.schema-card .sh-top .verdict-chip.warn{color:var(--red);border-color:var(--red);background:color-mix(in srgb,var(--red) 9%,transparent)}
+.schema-card .sh-top .verdict-chip.mix{color:var(--amber);border-color:var(--amber);background:color-mix(in srgb,var(--amber) 10%,transparent)}
+.schema-card .sh-top .ratio{font-family:var(--mono);font-size:11px;color:var(--ink3);margin-left:auto}
+.schema-card .sh-body{padding:18px 16px 10px}
+.schema-card .sh-foot{padding:10px 20px 16px;font-size:12.6px;color:var(--ink2);line-height:1.6}
+.schema-card .sh-foot b{color:var(--ink)} .schema-card .sh-foot code{font-family:var(--mono);font-size:.88em;color:var(--gold)}
+</style>
+</head>
+<body>
+<div class="app show-tech" id="app">
+
+  <!-- HEADER -->
+  <header>
+    <div class="brand">
+      <div class="mk"></div>
+      <div><h1>Chaîne d'authentification RDP — Kerberos</h1><small>VIp-coop · F5 niveau 4 · SPN <code style="color:#cfe;background:none;padding:0">TERMSRV/VIp-coop</code> créé · pool de 5 backends</small></div>
+    </div>
+    <div class="verdict"><span>Kerberos</span><span class="sep">·</span><span class="x">⚠ intermittent (1/5) ou nul (0/5) — non supporté</span></div>
+    <div class="tools">
+      <button class="tbtn on" id="techBtn"><span>⚙</span> Détails techniques</button>
+      <button class="tbtn" id="themeBtn"><span>◑</span> Thème</button>
+    </div>
+  </header>
+
+  <!-- INTRO -->
+  <div class="intro">
+    <p><b>Le décor :</b> le client (<code>mstsc</code>) vise le nom virtuel <code>VIp-coop.zres.ztech</code>. Le F5 est un <b>pur relais TCP (L4)</b> qui transmet les octets vers <b>un backend d'un pool de 5</b> sans rien terminer. <b>Nouveauté :</b> on a bien <b>créé le SPN <code>TERMSRV/VIp-coop.zres.ztech</code></b>. Le KDC émet donc maintenant un ticket — mais scellé à la clé d'<b>un seul</b> compte. La question devient&nbsp;: <i>que se passe-t-il une fois le ticket relayé jusqu'au backend, et comment l'hôte le perçoit-il&nbsp;?</i> La réponse tient toujours dans <b>une seule clé de chiffrement</b> — et dans le backend sur lequel le F5 tombe.</p>
+  </div>
+
+  <!-- MAP -->
+  <main>
+    <div class="stage">
+      <svg id="map" viewBox="0 0 1000 600" role="img" aria-label="Carte Kerberos bout-en-bout">
+        <defs>
+          <marker id="arrow" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6" fill="none" stroke="var(--line3)" stroke-width="1.3"/>
+          </marker>
+        </defs>
+
+        <!-- faint fan-out : le F5 pourrait tomber sur n'importe quel backend -->
+        <path d="M578,386 C648,360 686,300 722,205" style="fill:none;stroke:var(--line3);stroke-width:1.1;opacity:.22;stroke-dasharray:3 5"/>
+        <path d="M578,386 C648,360 686,300 722,273" style="fill:none;stroke:var(--line3);stroke-width:1.1;opacity:.22;stroke-dasharray:3 5"/>
+        <path d="M578,386 C648,372 686,360 722,409" style="fill:none;stroke:var(--line3);stroke-width:1.1;opacity:.22;stroke-dasharray:3 5"/>
+        <path d="M578,386 C648,380 686,420 722,477" style="fill:none;stroke:var(--line3);stroke-width:1.1;opacity:.22;stroke-dasharray:3 5"/>
+
+        <!-- LINKS -->
+        <path id="lk-kerb"  class="link" d="M150,326 C150,150 280,70 400,70"/>
+        <path id="lk-tgs"   class="link" d="M470,106 C360,210 230,270 200,326"/>
+        <path id="lk-tcp"   class="link" d="M244,369 H398"/>
+        <path id="lk-relay" class="link bad" d="M578,365 C642,356 686,348 722,341"/>
+        <!-- packet paths (invisible) -->
+        <path id="pp-kerb"   d="M150,326 C150,150 280,70 400,70" fill="none" stroke="none"/>
+        <path id="pp-tgs"    d="M470,106 C360,210 230,270 200,326" fill="none" stroke="none"/>
+        <path id="pp-relay"  d="M150,369 H578 C642,361 686,350 722,341" fill="none" stroke="none"/>
+        <path id="pp-relayA" d="M150,369 H578 C642,320 690,250 722,205" fill="none" stroke="none"/>
+
+        <!-- annotations -->
+        <text class="anno" id="an-port"     x="250" y="196">Kerberos · TCP/UDP 88</text>
+        <text class="anno ok"  id="an-issue"   x="566" y="150">✓ SPN trouvé → ticket scellé (clé de A)</text>
+        <text class="anno" id="an-relay"    x="650" y="330">AP-REQ relayé dans TLS · L4</text>
+        <text class="anno" id="an-perceive" x="848" y="302">l'hôte tente d'ouvrir avec SA clé</text>
+        <text class="anno err" id="an-modified" x="636" y="380">✗ clé ≠ → KRB_AP_ERR_MODIFIED</text>
+        <text class="anno ok"  id="an-match"    x="845" y="170">✓ si le F5 atterrit sur A</text>
+
+        <!-- KDC -->
+        <g class="node" id="n-kdc">
+          <rect class="box" x="400" y="34" width="200" height="72" rx="13"/>
+          <path class="ic" d="M420,70 a7,7 0 1,0 0.01,0 M427,70 H443 M443,65 V75 M439,65 V75"/>
+          <text class="nm" x="503" y="62" font-size="13.5">KDC</text>
+          <text class="role" x="503" y="80" font-size="9.5">Active Directory · AS / TGS</text>
+          <text class="fq" x="503" y="95" font-size="8.5">krbtgt · détient les clés de comptes</text>
+        </g>
+
+        <!-- CLIENT -->
+        <g class="node" id="n-client">
+          <rect class="box" x="56" y="326" width="188" height="86" rx="13"/>
+          <rect class="ic" x="76" y="354" width="26" height="18" rx="2"/>
+          <path class="ic" d="M85,372 v5 M93,372 v5 M81,377 h16"/>
+          <text class="nm" x="160" y="358" font-size="13.5">MachineClient</text>
+          <text class="role" x="160" y="374" font-size="9.5">poste utilisateur · mstsc · SSPI</text>
+          <text class="fq" x="160" y="389" font-size="9">MachineClient.zcam.ztech</text>
+        </g>
+
+        <!-- F5 VIP -->
+        <g class="node" id="n-f5">
+          <rect class="box" x="398" y="326" width="180" height="86" rx="13"/>
+          <path class="ic" d="M418,356 l11,-6 l11,6 l-11,6 z M418,364 l11,6 l11,-6 M418,372 l11,6 l11,-6"/>
+          <text class="nm" x="497" y="358" font-size="13.5">VIp-coop (F5)</text>
+          <text class="role" x="497" y="374" font-size="9.5">relais TCP · L4 · ne lit pas Kerberos</text>
+          <text class="fq" x="497" y="389" font-size="9">VIp-coop.zres.ztech</text>
+        </g>
+
+        <!-- POOL of 5 -->
+        <rect class="pool-bg" x="702" y="150" width="278" height="372" rx="14"/>
+        <text class="pool-label" x="718" y="170">POOL DE 5 BACKENDS · TermService</text>
+
+        <g class="node" id="n-hostA">
+          <rect class="box" x="722" y="176" width="236" height="58" rx="12"/>
+          <text class="nm" x="742" y="200" font-size="11.5" text-anchor="start">MachineDest-A</text>
+          <text class="role" x="742" y="217" font-size="8.6" text-anchor="start">porte le SPN TERMSRV/VIp-coop</text>
+          <g class="keytag" transform="translate(916,199)">
+            <circle r="7" fill="none" stroke="var(--green)" stroke-width="2"/>
+            <path d="M5,0 H16 M12,0 V5 M16,0 V5" stroke="var(--green)" stroke-width="2" fill="none"/>
+          </g>
+        </g>
+
+        <g class="node" id="n-hostB">
+          <rect class="box" x="722" y="244" width="236" height="58" rx="12"/>
+          <text class="nm" x="742" y="268" font-size="11.5" text-anchor="start">MachineDest-B</text>
+          <text class="role" x="742" y="285" font-size="8.6" text-anchor="start">clé machine propre</text>
+          <g class="keytag" transform="translate(916,267)">
+            <circle r="7" fill="none" stroke="#2D7DD2" stroke-width="2"/>
+            <path d="M5,0 H16 M12,0 V5 M16,0 V5" stroke="#2D7DD2" stroke-width="2" fill="none"/>
+          </g>
+        </g>
+
+        <g class="node" id="n-hostC">
+          <rect class="box" x="722" y="312" width="236" height="58" rx="12"/>
+          <text class="nm" x="742" y="336" font-size="11.5" text-anchor="start">MachineDest-C</text>
+          <text class="role" x="742" y="353" font-size="8.6" text-anchor="start">a répondu (exemple) · clé ≠</text>
+          <g class="keytag" transform="translate(916,335)">
+            <circle r="7" fill="none" stroke="var(--amber)" stroke-width="2"/>
+            <path d="M5,0 H16 M12,0 V5 M16,0 V5" stroke="var(--amber)" stroke-width="2" fill="none"/>
+          </g>
+        </g>
+
+        <g class="node" id="n-hostD">
+          <rect class="box" x="722" y="380" width="236" height="58" rx="12"/>
+          <text class="nm" x="742" y="404" font-size="11.5" text-anchor="start">MachineDest-D</text>
+          <text class="role" x="742" y="421" font-size="8.6" text-anchor="start">clé machine propre</text>
+          <g class="keytag" transform="translate(916,403)">
+            <circle r="7" fill="none" stroke="var(--red)" stroke-width="2"/>
+            <path d="M5,0 H16 M12,0 V5 M16,0 V5" stroke="var(--red)" stroke-width="2" fill="none"/>
+          </g>
+        </g>
+
+        <g class="node" id="n-hostE">
+          <rect class="box" x="722" y="448" width="236" height="58" rx="12"/>
+          <text class="nm" x="742" y="472" font-size="11.5" text-anchor="start">MachineDest-E</text>
+          <text class="role" x="742" y="489" font-size="8.6" text-anchor="start">clé machine propre</text>
+          <g class="keytag" transform="translate(916,471)">
+            <circle r="7" fill="none" stroke="#7E57C2" stroke-width="2"/>
+            <path d="M5,0 H16 M12,0 V5 M16,0 V5" stroke="#7E57C2" stroke-width="2" fill="none"/>
+          </g>
+        </g>
+
+        <!-- packet -->
+        <circle id="packet" r="5.5" fill="var(--cyan)"/>
+      </svg>
+    </div>
+
+    <!-- PANEL -->
+    <aside class="panel">
+      <div class="step-head"><span class="idx" id="pIdx">01 / 08</span><span class="badge" id="pBadge">—</span></div>
+      <div class="phase" id="pPhase">—</div>
+      <h2 class="lead" id="pLead">—</h2>
+      <div class="key" id="pKey" hidden></div>
+      <div class="tech"><span class="tl">Détail technique</span><p id="pTech">—</p></div>
+      <div class="spacer"></div>
+      <div class="hint">◀ ▶ pour naviguer · Espace pour lire / pause</div>
+    </aside>
+  </main>
+
+  <!-- TIMELINE -->
+  <div class="footer">
+    <div class="ctrls">
+      <button class="cbtn" id="prevBtn" aria-label="Précédent">‹</button>
+      <button class="cbtn play" id="playBtn" aria-label="Lecture/pause">⏸</button>
+      <button class="cbtn" id="nextBtn" aria-label="Suivant">›</button>
+    </div>
+    <div class="track" id="track"></div>
+  </div>
+
+  <!-- ENCRYPTION EXPLAINER -->
+  <section>
+    <div class="sec-h">
+      <span class="tag">Le cœur du problème</span>
+      <h2>La clé qui chiffre le ticket</h2>
+      <span class="sub">choisis un scénario</span>
+    </div>
+    <div class="enc">
+      <div class="enc-top">
+        <p>Kerberos ne chiffre pas la session RDP (ça, c'est TLS/CredSSP). Mais il <b>authentifie au moyen de chiffrement</b>&nbsp;: le KDC chiffre la partie utile du ticket (clé de session + PAC) avec <b>la clé long-terme du compte qui porte le SPN</b>. L'hôte qui reçoit la connexion doit posséder <b>exactement cette clé</b> pour l'ouvrir. La preuve d'identité, côté serveur, <i>est</i> ce déchiffrement. Règle simple&nbsp;: <b>la couleur de la clé qui verrouille doit être identique à celle de la clé qui déverrouille.</b></p>
+      </div>
+      <div class="tabs" id="tabs"></div>
+      <div class="enc-stage" id="encStage">
+        <div class="flow">
+          <!-- locking -->
+          <div class="cell">
+            <div class="lbl">1 · Le KDC verrouille</div>
+            <div class="ticket">
+              <svg class="lock" viewBox="0 0 64 64" id="lockSvg">
+                <path class="shackle" d="M18,28 V22 a14,14 0 0,1 28,0 V28"/>
+                <rect class="body" x="12" y="28" width="40" height="30" rx="7"/>
+                <circle class="hole" cx="32" cy="42" r="4"/>
+                <rect class="hole" x="30" y="42" width="4" height="9" rx="1"/>
+              </svg>
+            </div>
+            <div class="who">Ticket de service</div>
+            <div class="keychip" id="lockKey"><span class="dot"></span><span id="lockKeyTxt">clé —</span></div>
+          </div>
+          <div class="arrow">→</div>
+          <!-- transit -->
+          <div class="cell">
+            <div class="lbl">2 · Le F5 relaie (L4)</div>
+            <div class="who" id="transitWho">vers un backend</div>
+            <div class="sub" id="transitSub">le F5 ne choisit pas selon Kerberos</div>
+          </div>
+          <div class="arrow">→</div>
+          <!-- decrypt verdict -->
+          <div class="vcell" id="vcell" style="--vc:var(--green)">
+            <div class="mark" id="vMark">✓</div>
+            <div class="vtxt" id="vTxt">—</div>
+            <div class="keychip" id="hostKey" style="margin-top:10px"><span class="dot"></span><span id="hostKeyTxt">clé —</span></div>
+            <div class="err" id="vErr"></div>
+            <div class="note" id="vNote"></div>
+          </div>
+        </div>
+        <div class="match-line" id="matchLine"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- THREE BLOCKERS -->
+  <section>
+    <div class="sec-h">
+      <span class="tag">Pourquoi c'est structurel</span>
+      <h2>Trois blocages qui se cumulent</h2>
+    </div>
+    <div class="cards">
+      <div class="card warn">
+        <div class="cn">BLOCAGE 1</div>
+        <h3>Le SPN est unique</h3>
+        <p><code>TERMSRV/VIp-coop.zres.ztech</code> ne peut exister que sur <b>un seul</b> compte de toute la forêt. Même créé, il ne désigne qu'une identité — jamais « le pool ».</p>
+      </div>
+      <div class="card warn">
+        <div class="cn">BLOCAGE 2</div>
+        <h3>Il faut posséder la clé</h3>
+        <p>L'hôte qui <b>répond réellement</b> doit détenir la clé ayant chiffré le ticket. Chaque backend a sa propre clé machine&nbsp;: si le F5 route vers un autre nœud → <code>AP_ERR_MODIFIED</code>.</p>
+      </div>
+      <div class="card warn">
+        <div class="cn">BLOCAGE 3</div>
+        <h3>RDP = identité machine</h3>
+        <p>TermService authentifie les connexions avec le <b>compte d'ordinateur</b> (LocalSystem), pas un compte arbitraire. Aucun moyen supporté de lui faire ouvrir les tickets d'un compte de service ou d'un <b>gMSA</b>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHAT WOULD WORK -->
+  <section>
+    <div class="sec-h">
+      <span class="tag">Les seules issues</span>
+      <h2>Ce qui ferait réellement marcher Kerberos</h2>
+      <span class="sub">… au prix d'un changement de design</span>
+    </div>
+    <div class="cards">
+      <div class="card ok">
+        <div class="cn">OPTION A</div>
+        <h3>Backend unique</h3>
+        <p>On pose <code>TERMSRV/VIp-coop</code> <i>et</i> <code>HOST/VIp-coop</code> sur le compte machine de <b>l'unique</b> hôte (<code>setspn -S</code>). Le ticket pour la VIP devient déchiffrable par ce host.</p>
+        <div class="tradeoff">Compromis : un seul backend — plus de répartition ni de HA.</div>
+      </div>
+      <div class="card alt">
+        <div class="cn">OPTION B</div>
+        <h3>F5 APM + KCD (S4U2Proxy)</h3>
+        <p>Le F5 <b>termine</b> la connexion, pré-authentifie l'utilisateur, puis obtient lui-même un ticket vers le <b>vrai SPN du backend</b> (<code>TERMSRV/MachineDest</code>) au nom de l'utilisateur, via délégation contrainte.</p>
+        <div class="tradeoff">Compromis : fini le L4 pur et le CredSSP de bout en bout.</div>
+      </div>
+      <div class="card alt">
+        <div class="cn">OPTION C</div>
+        <h3>RD Connection Broker</h3>
+        <p>La brique native Microsoft&nbsp;: le client est redirigé vers l'hôte de session <b>réel</b>, et Kerberos s'opère contre le vrai nom de cet hôte, pas contre la VIP.</p>
+        <div class="tradeoff">Compromis : ce n'est plus un simple VIP L4 sur F5.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WIRESHARK -->
+  <section>
+    <div class="sec-h">
+      <span class="tag">Côté capture</span>
+      <h2>Dans Wireshark — ce que vous devez voir</h2>
+      <span class="sub">2 captures · côté client + côté backend</span>
+    </div>
+
+    <div class="lead-note">
+      <p>Maintenant que <b>le SPN existe</b>, la capture <b>côté client</b> raconte une histoire trompeuse&nbsp;: l'ouverture TCP vers la VIP, la négociation RDP (X.224), l'échange Kerberos sur le port&nbsp;88 <b>avant le moindre paquet TLS</b> — et cette fois le <code>TGS-REP</code> <b>réussit</b> (le ticket est émis !). Puis le <b>handshake TLS</b>, et seulement des <code>Application Data</code> opaques.</p>
+      <p><span class="warn">Le piège a changé de place :</span> dans l'ancien scénario « sans SPN », l'échec (<code>erreur 7</code>) était <b>en clair</b> sur le port 88. Désormais le ticket part bien, l'<code>AP-REQ</code> est présenté <b>à l'intérieur de TLS</b>, et c'est là — invisible en clair — que le backend répond <code>AP_ERR_MODIFIED</code>. <b>Côté client, vous voyez un Kerberos « réussi » puis un repli NTLM inexpliqué.</b> Pour voir le « pourquoi », il faut capturer <b>sur le backend</b> (2ᵉ tableau).</p>
+    </div>
+
+    <div class="qabox">
+      <p class="q">« Kerberos se fait donc avant TLS ? »</p>
+      <p><span class="em">Oui — pour la partie que vous voyez.</span> Il faut distinguer deux sous-étapes que l'on confond souvent :</p>
+      <p><b>1 · Récupérer le ticket auprès du KDC</b> (TGS-REQ / TGS-REP sur le port 88). C'est une conversation <b>séparée avec le contrôleur de domaine</b>, qui n'a pas besoin du canal TLS vers le serveur RDP. Windows la déclenche dès l'initialisation du contexte de sécurité (<code>InitializeSecurityContext</code>), donc <b>avant</b> d'ouvrir TLS. → c'est exactement ce que montre votre capture, et avec le SPN créé, <b>elle aboutit</b>.</p>
+      <p><b>2 · Présenter le jeton au serveur RDP</b> (l'<code>AP-REQ</code>, à l'intérieur de SPNEGO/CredSSP). Celui-là passe <b>dans le tunnel TLS</b>, après le handshake. Cette fois il <b>existe</b> (trame 14) — mais le backend qui le reçoit n'a pas la bonne clé&nbsp;: il renvoie <code>KRB_AP_ERR_MODIFIED</code> <b>dans</b> TLS (trame 15, opaque), et le client bascule sur NTLMv2 — toujours dans TLS.</p>
+      <p>Autrement dit : <b>l'obtention du ticket précède TLS (et réussit) ; la présentation du ticket — et son échec — se font dans TLS.</b> Deux moments différents, et seul le second porte désormais le problème.</p>
+    </div>
+
+    <div class="pcap">
+      <div class="pcap-bar">
+        <span class="cap-where client">① sur le poste client</span>
+        <span class="ttl">Filtre</span>
+        <span class="flt">kerberos || tcp.port == 3389 || tls</span>
+      </div>
+      <div class="ptbl-wrap">
+        <table class="ptbl">
+          <thead>
+            <tr><th>No.</th><th>Time</th><th>Source</th><th>Destination</th><th>Proto</th><th>Len</th><th>Info</th></tr>
+          </thead>
+          <tbody>
+            <tr class="tcp"><td class="no">1</td><td>0.000</td><td>10.20.10.55</td><td>10.30.0.40</td><td class="proto tcp">TCP</td><td>66</td><td class="info">51344 → 3389 [SYN]</td></tr>
+            <tr class="tcp"><td class="no">2</td><td>0.001</td><td>10.30.0.40</td><td>10.20.10.55</td><td class="proto tcp">TCP</td><td>66</td><td class="info">3389 → 51344 [SYN, ACK]</td></tr>
+            <tr class="tcp"><td class="no">3</td><td>0.001</td><td>10.20.10.55</td><td>10.30.0.40</td><td class="proto tcp">TCP</td><td>60</td><td class="info">51344 → 3389 [ACK]</td></tr>
+            <tr><td class="no">4</td><td>0.002</td><td>10.20.10.55</td><td>10.30.0.40</td><td class="proto rdp">RDP</td><td>87</td><td class="info">Negotiate Request — requestedProtocols : TLS, CredSSP (HYBRID)</td></tr>
+            <tr><td class="no">5</td><td>0.004</td><td>10.30.0.40</td><td>10.20.10.55</td><td class="proto rdp">RDP</td><td>72</td><td class="info">Negotiate Response — selectedProtocol : CredSSP (HYBRID)</td></tr>
+            <tr class="sep"><td colspan="7">— SSPI initialise le contexte : il récupère le ticket auprès du KDC (port 88), AVANT TLS —</td></tr>
+            <tr class="krb hot"><td class="no">6</td><td>0.006</td><td>10.20.10.55</td><td>10.20.0.10</td><td class="proto krb">KRB5</td><td>1480</td><td class="info">TGS-REQ → KDC de ZCAM.ZTECH — sname : <b>TERMSRV/VIp-coop.zres.ztech</b></td></tr>
+            <tr class="krb"><td class="no">7</td><td>0.009</td><td>10.20.0.10</td><td>10.20.10.55</td><td class="proto krb">KRB5</td><td>1320</td><td class="info">TGS-REP — <b>renvoi (referral)</b> : ticket pour krbtgt/ZRES.ZTECH</td></tr>
+            <tr class="krb"><td class="no">8</td><td>0.012</td><td>10.20.10.55</td><td>10.40.0.10</td><td class="proto krb">KRB5</td><td>1490</td><td class="info">TGS-REQ → KDC de ZRES.ZTECH — sname : <b>TERMSRV/VIp-coop.zres.ztech</b></td></tr>
+            <tr class="okk hot"><td class="no">9</td><td>0.015</td><td>10.40.0.10</td><td>10.20.10.55</td><td class="proto ok">KRB5</td><td>1410</td><td class="info">TGS-REP — <b>ticket émis ✓</b> (le SPN existe) · enc-part chiffrée clé de MachineDest-A ◀ ça passe, maintenant</td></tr>
+            <tr class="sep"><td colspan="7">— ticket en main : le client ouvre TLS, puis présente l'AP-REQ DANS le tunnel —</td></tr>
+            <tr class="tls hot"><td class="no">10</td><td>0.020</td><td>10.20.10.55</td><td>10.30.0.40</td><td class="proto tls">TLSv1.2</td><td>254</td><td class="info">Client Hello — <b>(premier paquet TLS, après Kerberos)</b></td></tr>
+            <tr class="tls"><td class="no">11</td><td>0.024</td><td>10.30.0.40</td><td>10.20.10.55</td><td class="proto tls">TLSv1.2</td><td>1414</td><td class="info">Server Hello, Certificate <b>(SAN = VIp-coop.zres.ztech)</b>, Server Hello Done</td></tr>
+            <tr class="tls"><td class="no">12</td><td>0.028</td><td>10.20.10.55</td><td>10.30.0.40</td><td class="proto tls">TLSv1.2</td><td>192</td><td class="info">Client Key Exchange, Change Cipher Spec, Finished</td></tr>
+            <tr class="tls"><td class="no">13</td><td>0.030</td><td>10.30.0.40</td><td>10.20.10.55</td><td class="proto tls">TLSv1.2</td><td>280</td><td class="info">Change Cipher Spec, Finished — canal TLS établi</td></tr>
+            <tr class="tls hot"><td class="no">14</td><td>0.034</td><td>10.20.10.55</td><td>10.30.0.40</td><td class="proto tls">TLSv1.2</td><td>610</td><td class="info">Application Data — SPNEGO → <b>AP-REQ</b> (TERMSRV/VIp-coop) <i>présenté ici · chiffré</i></td></tr>
+            <tr class="tls hot"><td class="no">15</td><td>0.038</td><td>10.30.0.40</td><td>10.20.10.55</td><td class="proto tls">TLSv1.2</td><td>240</td><td class="info">Application Data — rejet serveur <b>(AP_ERR_MODIFIED encapsulé)</b> <i>l'échec est ICI · invisible en clair</i></td></tr>
+            <tr class="tls"><td class="no">16</td><td>0.041</td><td>10.20.10.55</td><td>10.30.0.40</td><td class="proto tls">TLSv1.2</td><td>240</td><td class="info">Application Data — repli SPNEGO → NTLMSSP_NEGOTIATE <i>(chiffré)</i></td></tr>
+            <tr class="tls"><td class="no">17</td><td>0.044</td><td>10.30.0.40</td><td>10.20.10.55</td><td class="proto tls">TLSv1.2</td><td>360</td><td class="info">Application Data — NTLMSSP_CHALLENGE <i>(chiffré)</i></td></tr>
+            <tr class="tls"><td class="no">18</td><td>0.048</td><td>10.20.10.55</td><td>10.30.0.40</td><td class="proto tls">TLSv1.2</td><td>540</td><td class="info">Application Data — NTLMSSP_AUTHENTICATE + pubKeyAuth <i>(chiffré)</i></td></tr>
+            <tr class="tls"><td class="no">19</td><td>0.053</td><td>10.20.10.55</td><td>10.30.0.40</td><td class="proto tls">TLSv1.2</td><td>1380</td><td class="info">Application Data — session RDP : MCS / canaux virtuels <i>(chiffré)</i></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pcap-legend">
+        <span><i style="background:var(--ink3)"></i> TCP</span>
+        <span><i style="background:var(--violet)"></i> TLS</span>
+        <span><i style="background:var(--gold)"></i> Kerberos (port 88)</span>
+        <span><i style="background:var(--red)"></i> Erreur / révélateur</span>
+      </div>
+      <div class="pcap-note">
+        <b>Pourquoi deux TGS-REQ ?</b> Le poste est dans <code>ZCAM.ZTECH</code> mais la cible est dans <code>ZRES.ZTECH</code> : son KDC (<code>10.20.0.10</code>) ne peut pas émettre le ticket d'un autre domaine, il renvoie un <b>referral</b> vers ZRES (trame 7). Le client repose alors sa question au KDC de ZRES (<code>10.40.0.10</code>, trame 8), qui cette fois <b>émet le ticket</b> (trame 9) — le SPN existe désormais. <span class="hl">Et c'est là que le piège se referme : côté client, Kerberos a « réussi ».</span> L'<code>AP-REQ</code> part bien (trame 14) mais <b>à l'intérieur de TLS</b> ; le rejet <code>AP_ERR_MODIFIED</code> du backend (trame 15) est lui aussi <b>encapsulé dans TLS</b> — <code>kerberos</code> comme <code>ntlmssp</code> n'y montrent rien sans déchiffrement (clé privée serveur si RSA, ou <code>SSLKEYLOGFILE</code>). Conclusion : <b>cette capture seule ne dit pas pourquoi</b> ça bascule en NTLM — elle prouve juste que le ticket a été émis. Pour voir la cause, il faut capturer <b>sur le backend</b> (tableau ci-dessous) ou lire son <b>journal de sécurité</b>. Si le poste n'a pas de TGT en cache, un <b>AS-REQ / AS-REP</b> (msg_type 10 / 11) précède encore tout cela.
+      </div>
+    </div>
+
+    <div class="subh">② La même session, vue depuis le backend (MachineDest-C)</div>
+    <div class="pcap alt">
+      <div class="pcap-bar">
+        <span class="cap-where">② sur le backend · MachineDest-C</span>
+        <span class="ttl">Filtre</span>
+        <span class="flt">tcp.port == 3389 || kerberos || ldap || dcerpc || dns</span>
+      </div>
+      <div class="ptbl-wrap">
+        <table class="ptbl">
+          <thead>
+            <tr><th>No.</th><th>Time</th><th>Source</th><th>Destination</th><th>Proto</th><th>Len</th><th>Info</th></tr>
+          </thead>
+          <tbody>
+            <tr class="sep"><td colspan="7">— le F5 relaie les octets du client : tout arrive SNATé depuis l'adresse du F5 (10.50.0.250) —</td></tr>
+            <tr class="tcp"><td class="no">1</td><td>0.000</td><td>10.50.0.250</td><td>10.50.0.23</td><td class="proto tcp">TCP</td><td>66</td><td class="info">44910 → 3389 [SYN] — source = F5 (SNAT), <b>pas</b> l'IP du client</td></tr>
+            <tr class="tcp"><td class="no">2</td><td>0.000</td><td>10.50.0.23</td><td>10.50.0.250</td><td class="proto tcp">TCP</td><td>66</td><td class="info">3389 → 44910 [SYN, ACK]</td></tr>
+            <tr><td class="no">3</td><td>0.002</td><td>10.50.0.250</td><td>10.50.0.23</td><td class="proto rdp">RDP</td><td>87</td><td class="info">Negotiate Request (octets relayés) — TLS, CredSSP</td></tr>
+            <tr><td class="no">4</td><td>0.003</td><td>10.50.0.23</td><td>10.50.0.250</td><td class="proto rdp">RDP</td><td>72</td><td class="info">Negotiate Response — CredSSP (HYBRID)</td></tr>
+            <tr class="tls"><td class="no">5</td><td>0.006</td><td>10.50.0.250</td><td>10.50.0.23</td><td class="proto tls">TLSv1.2</td><td>254</td><td class="info">Client Hello (relayé)</td></tr>
+            <tr class="tls"><td class="no">6</td><td>0.009</td><td>10.50.0.23</td><td>10.50.0.250</td><td class="proto tls">TLSv1.2</td><td>1414</td><td class="info">Server Hello, Certificate <b>(c'est MachineDest-C qui présente son cert)</b>, Done</td></tr>
+            <tr class="tls"><td class="no">7</td><td>0.013</td><td>10.50.0.250</td><td>10.50.0.23</td><td class="proto tls">TLSv1.2</td><td>192</td><td class="info">Client Key Exchange, Change Cipher Spec, Finished</td></tr>
+            <tr class="tls hot"><td class="no">8</td><td>0.018</td><td>10.50.0.250</td><td>10.50.0.23</td><td class="proto tls">TLSv1.2</td><td>610</td><td class="info">Application Data — l'<b>AP-REQ relayé arrive ici</b> · chiffré · <i>C tente sa clé machine → échoue (invisible sur le fil)</i></td></tr>
+            <tr class="sep"><td colspan="7">— en parallèle, C fait SON ménage vers le DC, lui EN CLAIR (port 88 / 389) —</td></tr>
+            <tr class="dns"><td class="no">9</td><td>0.019</td><td>10.50.0.23</td><td>10.40.0.10</td><td class="proto dns">DNS</td><td>88</td><td class="info">Standard query — SRV _kerberos._tcp.ZRES.ZTECH</td></tr>
+            <tr class="dns"><td class="no">10</td><td>0.020</td><td>10.40.0.10</td><td>10.50.0.23</td><td class="proto dns">DNS</td><td>140</td><td class="info">Standard query response — DC = zres-dc01.ZRES.ZTECH</td></tr>
+            <tr class="krb hot"><td class="no">11</td><td>0.022</td><td>10.50.0.23</td><td>10.40.0.10</td><td class="proto krb">KRB5</td><td>270</td><td class="info">AS-REQ — cname : <b>MACHINEDEST-C$</b> (première tentative, sans pré-auth)</td></tr>
+            <tr class="err hot"><td class="no">12</td><td>0.024</td><td>10.40.0.10</td><td>10.50.0.23</td><td class="proto err">KRB5</td><td>220</td><td class="info">KRB-ERROR — <b>KDC_ERR_PREAUTH_REQUIRED (25)</b> ◀ normal, ce n'est <u>pas</u> l'échec RDP</td></tr>
+            <tr class="krb"><td class="no">13</td><td>0.026</td><td>10.50.0.23</td><td>10.40.0.10</td><td class="proto krb">KRB5</td><td>340</td><td class="info">AS-REQ — avec <b>PA-ENC-TIMESTAMP</b> (pré-auth chiffrée)</td></tr>
+            <tr class="krb"><td class="no">14</td><td>0.029</td><td>10.40.0.10</td><td>10.50.0.23</td><td class="proto krb">KRB5</td><td>1490</td><td class="info">AS-REP — TGT émis pour MACHINEDEST-C$</td></tr>
+            <tr class="krb"><td class="no">15</td><td>0.031</td><td>10.50.0.23</td><td>10.40.0.10</td><td class="proto krb">KRB5</td><td>1500</td><td class="info">TGS-REQ — sname : <b>ldap/zres-dc01.ZRES.ZTECH</b></td></tr>
+            <tr class="krb"><td class="no">16</td><td>0.034</td><td>10.40.0.10</td><td>10.50.0.23</td><td class="proto krb">KRB5</td><td>1420</td><td class="info">TGS-REP — ticket LDAP émis (C s'authentifie au DC : <b>ça marche</b>)</td></tr>
+            <tr class="ldap"><td class="no">17</td><td>0.036</td><td>10.50.0.23</td><td>10.40.0.10</td><td class="proto ldap">LDAP</td><td>1490</td><td class="info">bindRequest — SASL <b>GSS-SPNEGO</b> (le ménage LDAP de C, Kerberos ✓)</td></tr>
+            <tr class="ldap"><td class="no">18</td><td>0.039</td><td>10.40.0.10</td><td>10.50.0.23</td><td class="proto ldap">LDAP</td><td>74</td><td class="info">bindResponse — <b>success</b> · puis searchRequest (politiques, groupes…)</td></tr>
+            <tr class="sep"><td colspan="7">— l'AP-REQ du client n'a pas pu être ouvert → repli NTLM : C valide la réponse NTLM via le DC —</td></tr>
+            <tr class="nrpc hot"><td class="no">19</td><td>0.052</td><td>10.50.0.23</td><td>10.40.0.10</td><td class="proto nrpc">RPC_NETLOGON</td><td>420</td><td class="info">NetrLogonSamLogonEx — validation <b>NTLMv2</b> (MS-NRPC) ◀ la vraie trace du repli</td></tr>
+            <tr class="nrpc"><td class="no">20</td><td>0.058</td><td>10.40.0.10</td><td>10.50.0.23</td><td class="proto nrpc">RPC_NETLOGON</td><td>380</td><td class="info">NetrLogonSamLogonEx response — STATUS_SUCCESS (l'utilisateur passe… en NTLM)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pcap-legend">
+        <span><i style="background:var(--ink3)"></i> TCP / DNS</span>
+        <span><i style="background:var(--violet)"></i> TLS · LDAP</span>
+        <span><i style="background:var(--gold)"></i> Kerberos (ménage de C)</span>
+        <span><i style="background:var(--red)"></i> KRB-ERROR (pré-auth, anodin)</span>
+        <span><i style="background:var(--amber)"></i> Netlogon NTLM (le repli)</span>
+      </div>
+      <div class="pcap-note">
+        <b>Le piège des « erreurs en clair ».</b> Sur le backend on voit beaucoup de Kerberos en clair — mais <span class="hl">presque tout est le ménage normal de C, pas l'échec RDP.</span> L'<code>AS-REQ</code> → <code>KRB-ERROR (25)</code> (trames 11-12) est le <b>tâtonnement de pré-authentification standard</b> de toute machine Windows : elle demande sans pré-auth, le DC réclame un horodatage chiffré, elle recommence. Le <code>bindRequest</code> LDAP (trame 17) est l'ouverture de session de C vers l'annuaire. <b>Ni l'un ni l'autre n'est la cause.</b> Le vrai échec — l'AP-REQ relayé que C ne sait pas déchiffrer — s'est produit <b>dans TLS (trame 8)</b> : sur le fil il reste opaque. La seule trace réseau lisible est <b>indirecte</b> : le <code>NetrLogonSamLogonEx</code> (trames 19-20) prouve qu'on a basculé en <b>NTLM</b>. Pour le voir noir sur blanc, lisez le <b>journal Sécurité de MachineDest-C</b> : un <code>4625</code> (échec) ou un <code>4624</code> avec <code>Package = NTLM</code>, et le canal <code>Microsoft-Windows-Security-Kerberos</code> pour <code>KRB_AP_ERR_MODIFIED</code>.<br><br><b>Et si le F5 était tombé sur MachineDest-A&nbsp;?</b> La trame 8 se déchiffrerait avec la clé de A → aucun repli, pas de Netlogon NTLM, juste un <code>4624</code> avec <code>Package = Kerberos</code>. C'est précisément ce <b>1/5</b> qui rend la panne intermittente.
+      </div>
+    </div>
+
+    <div class="subh">Filtres d'affichage utiles</div>
+    <div class="fbox">
+      <span class="f">kerberos</span>                       <span class="c"># tout l'échange Kerberos (en clair : 88, et le ménage backend)</span><br>
+      <span class="f">kerberos.msg_type == 30</span>        <span class="c"># ne garder que les KRB-ERROR</span><br>
+      <span class="f">kerberos.error_code == 25</span>      <span class="c"># PREAUTH_REQUIRED — anodin, le tâtonnement normal d'une machine</span><br>
+      <span class="f">tcp.port == 3389</span>               <span class="c"># le flux RDP / CredSSP (relayé par le F5)</span><br>
+      <span class="f">ldap.bindRequest</span>               <span class="c"># le bind GSS-SPNEGO du backend vers le DC</span><br>
+      <span class="f">dcerpc &amp;&amp; netlogon</span>            <span class="c"># NetrLogonSamLogonEx = preuve d'un repli NTLM</span><br>
+      <span class="warnf">ntlmssp</span>                       <span class="c"># ⚠ ne matche rien côté client : NTLM est chiffré dans TLS</span>
+    </div>
+
+    <div class="subh">Les trois choses à comprendre dans ces captures</div>
+    <div class="cards">
+      <div class="card">
+        <div class="cn">L'ORDRE</div>
+        <h3>Kerberos avant TLS, AP-REQ dans TLS</h3>
+        <p>Le ticket est demandé au KDC dès l'init du contexte → <b>avant</b> le <code>Client Hello</code> (trames 6→9, en clair). L'<code>AP-REQ</code>, lui, est présenté <b>après</b> le handshake, <b>dans</b> le tunnel (trame 14). Cette fois le ticket <b>existe</b> : Kerberos « réussit » côté client.</p>
+      </div>
+      <div class="card alt">
+        <div class="cn">TRAMES 6 → 9</div>
+        <h3>Un renvoi (referral) puis succès</h3>
+        <p>Le double <code>TGS-REQ</code> est normal : la cible <code>ZRES.ZTECH</code> n'est pas le domaine du poste (<code>ZCAM.ZTECH</code>). Le premier KDC renvoie vers ZRES (7), le client réitère (8), et ZRES <b>émet le ticket</b> (9) — scellé à la clé d'<b>un seul</b> compte.</p>
+      </div>
+      <div class="card warn">
+        <div class="cn">TRAMES 14-15 · BACKEND</div>
+        <h3>AP_ERR_MODIFIED, caché dans TLS</h3>
+        <p>Le backend qui reçoit n'a pas la bonne clé → <code>KRB_AP_ERR_MODIFIED</code>, mais <b>à l'intérieur de TLS</b> (opaque sur le fil). Côté client : Kerberos OK puis NTLM « mystérieux ». La preuve est <b>sur le backend</b> (journal de sécurité) ou via le <code>Netlogon</code> du 2ᵉ tableau.</p>
+      </div>
+    </div>
+
+    <div class="subh">Attention à l'endroit où vous capturez</div>
+    <div class="cards">
+      <div class="card warn">
+        <div class="cn">① SUR LE POSTE CLIENT</div>
+        <h3>Le ticket part, l'échec est opaque</h3>
+        <p>Vous voyez l'aller-retour Kerberos (88) <b>réussir</b>, puis du <code>Application Data</code> TLS et un repli NTLM — <b>sans la raison</b>. Utile pour confirmer que le ticket est bien émis, <b>insuffisant</b> pour diagnostiquer le repli.</p>
+      </div>
+      <div class="card alt">
+        <div class="cn">ENTRE F5 ET BACKEND</div>
+        <h3>SNAT + persistance visibles</h3>
+        <p>Les octets arrivent <b>SNATés depuis l'IP du F5</b> (pas le client), vers <b>un</b> backend du pool. On y lit la persistance <code>source-address</code> — donc <b>quel</b> backend a reçu la session — mais toujours pas le contenu (TLS).</p>
+      </div>
+      <div class="card ok">
+        <div class="cn">② SUR LE BACKEND</div>
+        <h3>Le seul endroit où voir la vérité</h3>
+        <p><b>C'est ici qu'il faut capturer.</b> Le <code>Netlogon</code> (MS-NRPC) trahit le repli NTLM ; surtout, le <b>journal Sécurité</b> du backend porte le <code>4625</code>/<code>KRB_AP_ERR_MODIFIED</code> puis le <code>4624</code> NTLM — la cause, noir sur blanc.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PLAIN-LANGUAGE: KEY COLORS -->
+  <section>
+    <div class="sec-h">
+      <span class="tag">Pour bien visualiser</span>
+      <h2>Le nom n'est pas une adresse — l'histoire des couleurs de clé</h2>
+    </div>
+
+    <div class="qabox">
+      <p class="q">« Si le ticket porte bien TERMSRV/VIp-coop, pourquoi un autre serveur ne l'accepte pas ? »</p>
+      <p>Parce que ce nom n'est <b>pas une adresse de livraison</b>. C'est seulement une consigne donnée au KDC : <span class="em">« scelle ce ticket avec le cadenas du compte qui porte ce nom »</span>. À l'arrivée, le serveur ne lit pas le nom pour décider — il essaie juste d'<b>ouvrir le ticket avec sa propre clé</b>. S'il a la bonne clé, ça s'ouvre ; sinon, non — quel que soit le nom écrit dessus.</p>
+      <p>L'image de la poste : l'étiquette dit « ferme ce colis avec le cadenas du serveur A ». Le colis n'est pas remis « au nom marqué dessus », il est <b>scellé avec un cadenas précis</b>. Le serveur B reçoit bien un colis marqué « VIP », mais il n'a pas la bonne clé — l'étiquette ne l'aide pas à l'ouvrir.</p>
+    </div>
+
+    <div class="subh">D'abord : c'est quoi « une couleur de clé » ?</div>
+    <div class="lead-note">
+      <p>Chaque machine du domaine possède une <b>clé secrète qui lui est propre</b> (dérivée du mot de passe de son compte d'ordinateur). Personne ne la partage. Dans ce schéma, je représente <b>chaque clé par une couleur</b> : <b>même couleur = même clé</b> (on peut ouvrir), <b>couleur différente = clé incompatible</b> (on ne peut pas). Le KDC, lui, connaît la clé de toutes les machines — il peut donc fermer un ticket avec la couleur de n'importe laquelle. Le cadenas prend alors <b>la couleur de la clé qui l'a fermé</b>, et seule une clé de la même couleur le rouvre.</p>
+    </div>
+
+    <div class="subh">Les deux façons de poser le SPN</div>
+    <div class="schemas">
+
+      <div class="schema-card">
+        <div class="sh-top">
+          <h3>Schéma 1 — SPN sur une machine du pool (MachineDest-A)</h3>
+          <span class="verdict-chip mix">intermittent</span>
+          <span class="ratio">Kerberos : 1/5</span>
+        </div>
+        <div class="sh-body">
+          <svg viewBox="0 0 960 470" role="img" aria-label="Schéma des couleurs de clé" style="width:100%;height:auto;display:block"><defs><marker id="arrS1" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" style="fill:none;stroke:var(--line3);stroke-width:1.3"/></marker></defs><rect class="box" x="360" y="16" width="240" height="58" rx="12"/><text class="nm" x="480" y="40" font-size="13.5" text-anchor="middle">KDC · Active Directory</text><text class="role" x="480" y="60" font-size="9.5" text-anchor="middle">il scelle avec la clé du compte qui porte le SPN</text><path d="M480,74 V92" style="fill:none;stroke:var(--line3);stroke-width:1.6" marker-end="url(#arrS1)"/><rect class="box" x="384" y="94" width="192" height="58" rx="10"/><rect x="468" y="104" width="24" height="18" rx="3" fill="#1FA45A" fill-opacity="0.14" stroke="#1FA45A" stroke-width="2"/><path d="M472,104 V99 a7,7 0 0,1 14,0 V104" fill="none" stroke="#1FA45A" stroke-width="2.5"/><circle cx="480.0" cy="112" r="2" fill="#1FA45A"/><text class="role" x="480" y="134" font-size="10" text-anchor="middle">Ticket — cadenas VERT</text><text class="role" x="480" y="146" font-size="9" text-anchor="middle">(clé de MachineDest-A)</text><path d="M480,152 V172" style="fill:none;stroke:var(--line3);stroke-width:1.6" marker-end="url(#arrS1)"/><rect class="box" x="400" y="174" width="160" height="44" rx="10"/><text class="nm" x="480" y="194" font-size="12" text-anchor="middle">F5 — VIP (L4)</text><text class="role" x="480" y="209" font-size="9" text-anchor="middle">distribue vers 1 des 5 · ignore les couleurs</text><path d="M480,218 C296,238 112,230 112,248" style="fill:none;stroke:var(--line3);stroke-width:1.4" marker-end="url(#arrS1)"/><path d="M480,218 C388,238 296,230 296,248" style="fill:none;stroke:var(--line3);stroke-width:1.4" marker-end="url(#arrS1)"/><path d="M480,218 V248" style="fill:none;stroke:var(--line3);stroke-width:1.4" marker-end="url(#arrS1)"/><path d="M480,218 C572,238 664,230 664,248" style="fill:none;stroke:var(--line3);stroke-width:1.4" marker-end="url(#arrS1)"/><path d="M480,218 C664,238 848,230 848,248" style="fill:none;stroke:var(--line3);stroke-width:1.4" marker-end="url(#arrS1)"/><rect x="26" y="250" width="172" height="166" rx="14" style="fill:var(--panel2);stroke:#1FA45A;stroke-width:2"/><text x="112" y="278" text-anchor="middle" style="font-family:'Open Sans',sans-serif;font-size:13px;font-weight:700;fill:var(--ink)">MachineDest-A</text><text x="112" y="296" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:10px;fill:#1FA45A">clé verte</text><circle cx="66" cy="332" r="6.5" fill="none" stroke="#1FA45A" stroke-width="2.5"/><circle cx="66" cy="332" r="2.2" fill="#1FA45A"/><line x1="72" y1="332" x2="88" y2="332" stroke="#1FA45A" stroke-width="2.5"/><line x1="81" y1="332" x2="81" y2="338" stroke="#1FA45A" stroke-width="2.5"/><line x1="86" y1="332" x2="86" y2="339" stroke="#1FA45A" stroke-width="2.5"/><text x="110" y="337" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;fill:var(--ink3)">=</text><rect x="126" y="323" width="22" height="17" rx="3" fill="#1FA45A" fill-opacity="0.14" stroke="#1FA45A" stroke-width="2"/><path d="M130,323 V318 a7,7 0 0,1 14,0 V323" fill="none" stroke="#1FA45A" stroke-width="2.5"/><circle cx="137.0" cy="331" r="2" fill="#1FA45A"/><text x="112" y="378" text-anchor="middle" style="font-family:'Open Sans',sans-serif;font-size:15px;font-weight:800;fill:#1FA45A">✓ OK</text><text x="112" y="398" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:9px;fill:var(--ink2)">clé = cadenas</text><rect x="210" y="250" width="172" height="166" rx="14" style="fill:var(--panel2);stroke:#2D7DD2;stroke-width:2"/><text x="296" y="278" text-anchor="middle" style="font-family:'Open Sans',sans-serif;font-size:13px;font-weight:700;fill:var(--ink)">MachineDest-B</text><text x="296" y="296" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:10px;fill:#2D7DD2">clé bleue</text><circle cx="250" cy="332" r="6.5" fill="none" stroke="#2D7DD2" stroke-width="2.5"/><circle cx="250" cy="332" r="2.2" fill="#2D7DD2"/><line x1="256" y1="332" x2="272" y2="332" stroke="#2D7DD2" stroke-width="2.5"/><line x1="265" y1="332" x2="265" y2="338" stroke="#2D7DD2" stroke-width="2.5"/><line x1="270" y1="332" x2="270" y2="339" stroke="#2D7DD2" stroke-width="2.5"/><text x="294" y="337" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;fill:var(--ink3)">≠</text><rect x="310" y="323" width="22" height="17" rx="3" fill="#1FA45A" fill-opacity="0.14" stroke="#1FA45A" stroke-width="2"/><path d="M314,323 V318 a7,7 0 0,1 14,0 V323" fill="none" stroke="#1FA45A" stroke-width="2.5"/><circle cx="321.0" cy="331" r="2" fill="#1FA45A"/><text x="296" y="378" text-anchor="middle" style="font-family:'Open Sans',sans-serif;font-size:15px;font-weight:800;fill:#D64545">✗ ÉCHEC</text><text x="296" y="398" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:9px;fill:#D64545">AP_ERR_MODIFIED</text><rect x="394" y="250" width="172" height="166" rx="14" style="fill:var(--panel2);stroke:#E08A2B;stroke-width:2"/><text x="480" y="278" text-anchor="middle" style="font-family:'Open Sans',sans-serif;font-size:13px;font-weight:700;fill:var(--ink)">MachineDest-C</text><text x="480" y="296" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:10px;fill:#E08A2B">clé ambre</text><circle cx="434" cy="332" r="6.5" fill="none" stroke="#E08A2B" stroke-width="2.5"/><circle cx="434" cy="332" r="2.2" fill="#E08A2B"/><line x1="440" y1="332" x2="456" y2="332" stroke="#E08A2B" stroke-width="2.5"/><line x1="449" y1="332" x2="449" y2="338" stroke="#E08A2B" stroke-width="2.5"/><line x1="454" y1="332" x2="454" y2="339" stroke="#E08A2B" stroke-width="2.5"/><text x="478" y="337" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;fill:var(--ink3)">≠</text><rect x="494" y="323" width="22" height="17" rx="3" fill="#1FA45A" fill-opacity="0.14" stroke="#1FA45A" stroke-width="2"/><path d="M498,323 V318 a7,7 0 0,1 14,0 V323" fill="none" stroke="#1FA45A" stroke-width="2.5"/><circle cx="505.0" cy="331" r="2" fill="#1FA45A"/><text x="480" y="378" text-anchor="middle" style="font-family:'Open Sans',sans-serif;font-size:15px;font-weight:800;fill:#D64545">✗ ÉCHEC</text><text x="480" y="398" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:9px;fill:#D64545">AP_ERR_MODIFIED</text><rect x="578" y="250" width="172" height="166" rx="14" style="fill:var(--panel2);stroke:#D64545;stroke-width:2"/><text x="664" y="278" text-anchor="middle" style="font-family:'Open Sans',sans-serif;font-size:13px;font-weight:700;fill:var(--ink)">MachineDest-D</text><text x="664" y="296" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:10px;fill:#D64545">clé rouge</text><circle cx="618" cy="332" r="6.5" fill="none" stroke="#D64545" stroke-width="2.5"/><circle cx="618" cy="332" r="2.2" fill="#D64545"/><line x1="624" y1="332" x2="640" y2="332" stroke="#D64545" stroke-width="2.5"/><line x1="633" y1="332" x2="633" y2="338" stroke="#D64545" stroke-width="2.5"/><line x1="638" y1="332" x2="638" y2="339" stroke="#D64545" stroke-width="2.5"/><text x="662" y="337" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;fill:var(--ink3)">≠</text><rect x="678" y="323" width="22" height="17" rx="3" fill="#1FA45A" fill-opacity="0.14" stroke="#1FA45A" stroke-width="2"/><path d="M682,323 V318 a7,7 0 0,1 14,0 V323" fill="none" stroke="#1FA45A" stroke-width="2.5"/><circle cx="689.0" cy="331" r="2" fill="#1FA45A"/><text x="664" y="378" text-anchor="middle" style="font-family:'Open Sans',sans-serif;font-size:15px;font-weight:800;fill:#D64545">✗ ÉCHEC</text><text x="664" y="398" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:9px;fill:#D64545">AP_ERR_MODIFIED</text><rect x="762" y="250" width="172" height="166" rx="14" style="fill:var(--panel2);stroke:#7E57C2;stroke-width:2"/><text x="848" y="278" text-anchor="middle" style="font-family:'Open Sans',sans-serif;font-size:13px;font-weight:700;fill:var(--ink)">MachineDest-E</text><text x="848" y="296" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:10px;fill:#7E57C2">clé violette</text><circle cx="802" cy="332" r="6.5" fill="none" stroke="#7E57C2" stroke-width="2.5"/><circle cx="802" cy="332" r="2.2" fill="#7E57C2"/><line x1="808" y1="332" x2="824" y2="332" stroke="#7E57C2" stroke-width="2.5"/><line x1="817" y1="332" x2="817" y2="338" stroke="#7E57C2" stroke-width="2.5"/><line x1="822" y1="332" x2="822" y2="339" stroke="#7E57C2" stroke-width="2.5"/><text x="846" y="337" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;fill:var(--ink3)">≠</text><rect x="862" y="323" width="22" height="17" rx="3" fill="#1FA45A" fill-opacity="0.14" stroke="#1FA45A" stroke-width="2"/><path d="M866,323 V318 a7,7 0 0,1 14,0 V323" fill="none" stroke="#1FA45A" stroke-width="2.5"/><circle cx="873.0" cy="331" r="2" fill="#1FA45A"/><text x="848" y="378" text-anchor="middle" style="font-family:'Open Sans',sans-serif;font-size:15px;font-weight:800;fill:#D64545">✗ ÉCHEC</text><text x="848" y="398" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:9px;fill:#D64545">AP_ERR_MODIFIED</text></svg>
+        </div>
+        <div class="sh-foot">
+          Le KDC scelle le ticket avec la clé de <b>MachineDest-A</b> (cadenas vert). Seul A sait l'ouvrir. Mais le F5 répartit sans connaître Kerberos&nbsp;: statistiquement <b>1 connexion sur 5</b> tombe sur A et aboutit, les 4 autres renvoient <code>AP_ERR_MODIFIED</code> et basculent en NTLM. → panne <b>intermittente</b>, la plus pénible à diagnostiquer (« ça marche une fois sur cinq »).
+        </div>
+      </div>
+
+      <div class="schema-card">
+        <div class="sh-top">
+          <h3>Schéma 2 — SPN sur un compte hors pool (svc-vip / gMSA)</h3>
+          <span class="verdict-chip warn">jamais en Kerberos</span>
+          <span class="ratio">Kerberos : 0/5</span>
+        </div>
+        <div class="sh-body">
+          <svg viewBox="0 0 960 470" role="img" aria-label="Schéma des couleurs de clé" style="width:100%;height:auto;display:block"><defs><marker id="arrS2" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" style="fill:none;stroke:var(--line3);stroke-width:1.3"/></marker></defs><rect class="box" x="360" y="16" width="240" height="58" rx="12"/><text class="nm" x="480" y="40" font-size="13.5" text-anchor="middle">KDC · Active Directory</text><text class="role" x="480" y="60" font-size="9.5" text-anchor="middle">il scelle avec la clé du compte qui porte le SPN</text><path d="M480,74 V92" style="fill:none;stroke:var(--line3);stroke-width:1.6" marker-end="url(#arrS2)"/><rect class="box" x="384" y="94" width="192" height="58" rx="10"/><rect x="468" y="104" width="24" height="18" rx="3" fill="#0E8C99" fill-opacity="0.14" stroke="#0E8C99" stroke-width="2"/><path d="M472,104 V99 a7,7 0 0,1 14,0 V104" fill="none" stroke="#0E8C99" stroke-width="2.5"/><circle cx="480.0" cy="112" r="2" fill="#0E8C99"/><text class="role" x="480" y="134" font-size="10" text-anchor="middle">Ticket — cadenas SARCELLE</text><text class="role" x="480" y="146" font-size="9" text-anchor="middle">(clé du compte de service / gMSA, hors pool)</text><path d="M480,152 V172" style="fill:none;stroke:var(--line3);stroke-width:1.6" marker-end="url(#arrS2)"/><rect class="box" x="400" y="174" width="160" height="44" rx="10"/><text class="nm" x="480" y="194" font-size="12" text-anchor="middle">F5 — VIP (L4)</text><text class="role" x="480" y="209" font-size="9" text-anchor="middle">distribue vers 1 des 5 · ignore les couleurs</text><path d="M480,218 C296,238 112,230 112,248" style="fill:none;stroke:var(--line3);stroke-width:1.4" marker-end="url(#arrS2)"/><path d="M480,218 C388,238 296,230 296,248" style="fill:none;stroke:var(--line3);stroke-width:1.4" marker-end="url(#arrS2)"/><path d="M480,218 V248" style="fill:none;stroke:var(--line3);stroke-width:1.4" marker-end="url(#arrS2)"/><path d="M480,218 C572,238 664,230 664,248" style="fill:none;stroke:var(--line3);stroke-width:1.4" marker-end="url(#arrS2)"/><path d="M480,218 C664,238 848,230 848,248" style="fill:none;stroke:var(--line3);stroke-width:1.4" marker-end="url(#arrS2)"/><rect x="26" y="250" width="172" height="166" rx="14" style="fill:var(--panel2);stroke:#1FA45A;stroke-width:2"/><text x="112" y="278" text-anchor="middle" style="font-family:'Open Sans',sans-serif;font-size:13px;font-weight:700;fill:var(--ink)">MachineDest-A</text><text x="112" y="296" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:10px;fill:#1FA45A">clé verte</text><circle cx="66" cy="332" r="6.5" fill="none" stroke="#1FA45A" stroke-width="2.5"/><circle cx="66" cy="332" r="2.2" fill="#1FA45A"/><line x1="72" y1="332" x2="88" y2="332" stroke="#1FA45A" stroke-width="2.5"/><line x1="81" y1="332" x2="81" y2="338" stroke="#1FA45A" stroke-width="2.5"/><line x1="86" y1="332" x2="86" y2="339" stroke="#1FA45A" stroke-width="2.5"/><text x="110" y="337" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;fill:var(--ink3)">≠</text><rect x="126" y="323" width="22" height="17" rx="3" fill="#0E8C99" fill-opacity="0.14" stroke="#0E8C99" stroke-width="2"/><path d="M130,323 V318 a7,7 0 0,1 14,0 V323" fill="none" stroke="#0E8C99" stroke-width="2.5"/><circle cx="137.0" cy="331" r="2" fill="#0E8C99"/><text x="112" y="378" text-anchor="middle" style="font-family:'Open Sans',sans-serif;font-size:15px;font-weight:800;fill:#D64545">✗ ÉCHEC</text><text x="112" y="398" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:9px;fill:#D64545">AP_ERR_MODIFIED</text><rect x="210" y="250" width="172" height="166" rx="14" style="fill:var(--panel2);stroke:#2D7DD2;stroke-width:2"/><text x="296" y="278" text-anchor="middle" style="font-family:'Open Sans',sans-serif;font-size:13px;font-weight:700;fill:var(--ink)">MachineDest-B</text><text x="296" y="296" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:10px;fill:#2D7DD2">clé bleue</text><circle cx="250" cy="332" r="6.5" fill="none" stroke="#2D7DD2" stroke-width="2.5"/><circle cx="250" cy="332" r="2.2" fill="#2D7DD2"/><line x1="256" y1="332" x2="272" y2="332" stroke="#2D7DD2" stroke-width="2.5"/><line x1="265" y1="332" x2="265" y2="338" stroke="#2D7DD2" stroke-width="2.5"/><line x1="270" y1="332" x2="270" y2="339" stroke="#2D7DD2" stroke-width="2.5"/><text x="294" y="337" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;fill:var(--ink3)">≠</text><rect x="310" y="323" width="22" height="17" rx="3" fill="#0E8C99" fill-opacity="0.14" stroke="#0E8C99" stroke-width="2"/><path d="M314,323 V318 a7,7 0 0,1 14,0 V323" fill="none" stroke="#0E8C99" stroke-width="2.5"/><circle cx="321.0" cy="331" r="2" fill="#0E8C99"/><text x="296" y="378" text-anchor="middle" style="font-family:'Open Sans',sans-serif;font-size:15px;font-weight:800;fill:#D64545">✗ ÉCHEC</text><text x="296" y="398" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:9px;fill:#D64545">AP_ERR_MODIFIED</text><rect x="394" y="250" width="172" height="166" rx="14" style="fill:var(--panel2);stroke:#E08A2B;stroke-width:2"/><text x="480" y="278" text-anchor="middle" style="font-family:'Open Sans',sans-serif;font-size:13px;font-weight:700;fill:var(--ink)">MachineDest-C</text><text x="480" y="296" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:10px;fill:#E08A2B">clé ambre</text><circle cx="434" cy="332" r="6.5" fill="none" stroke="#E08A2B" stroke-width="2.5"/><circle cx="434" cy="332" r="2.2" fill="#E08A2B"/><line x1="440" y1="332" x2="456" y2="332" stroke="#E08A2B" stroke-width="2.5"/><line x1="449" y1="332" x2="449" y2="338" stroke="#E08A2B" stroke-width="2.5"/><line x1="454" y1="332" x2="454" y2="339" stroke="#E08A2B" stroke-width="2.5"/><text x="478" y="337" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;fill:var(--ink3)">≠</text><rect x="494" y="323" width="22" height="17" rx="3" fill="#0E8C99" fill-opacity="0.14" stroke="#0E8C99" stroke-width="2"/><path d="M498,323 V318 a7,7 0 0,1 14,0 V323" fill="none" stroke="#0E8C99" stroke-width="2.5"/><circle cx="505.0" cy="331" r="2" fill="#0E8C99"/><text x="480" y="378" text-anchor="middle" style="font-family:'Open Sans',sans-serif;font-size:15px;font-weight:800;fill:#D64545">✗ ÉCHEC</text><text x="480" y="398" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:9px;fill:#D64545">AP_ERR_MODIFIED</text><rect x="578" y="250" width="172" height="166" rx="14" style="fill:var(--panel2);stroke:#D64545;stroke-width:2"/><text x="664" y="278" text-anchor="middle" style="font-family:'Open Sans',sans-serif;font-size:13px;font-weight:700;fill:var(--ink)">MachineDest-D</text><text x="664" y="296" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:10px;fill:#D64545">clé rouge</text><circle cx="618" cy="332" r="6.5" fill="none" stroke="#D64545" stroke-width="2.5"/><circle cx="618" cy="332" r="2.2" fill="#D64545"/><line x1="624" y1="332" x2="640" y2="332" stroke="#D64545" stroke-width="2.5"/><line x1="633" y1="332" x2="633" y2="338" stroke="#D64545" stroke-width="2.5"/><line x1="638" y1="332" x2="638" y2="339" stroke="#D64545" stroke-width="2.5"/><text x="662" y="337" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;fill:var(--ink3)">≠</text><rect x="678" y="323" width="22" height="17" rx="3" fill="#0E8C99" fill-opacity="0.14" stroke="#0E8C99" stroke-width="2"/><path d="M682,323 V318 a7,7 0 0,1 14,0 V323" fill="none" stroke="#0E8C99" stroke-width="2.5"/><circle cx="689.0" cy="331" r="2" fill="#0E8C99"/><text x="664" y="378" text-anchor="middle" style="font-family:'Open Sans',sans-serif;font-size:15px;font-weight:800;fill:#D64545">✗ ÉCHEC</text><text x="664" y="398" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:9px;fill:#D64545">AP_ERR_MODIFIED</text><rect x="762" y="250" width="172" height="166" rx="14" style="fill:var(--panel2);stroke:#7E57C2;stroke-width:2"/><text x="848" y="278" text-anchor="middle" style="font-family:'Open Sans',sans-serif;font-size:13px;font-weight:700;fill:var(--ink)">MachineDest-E</text><text x="848" y="296" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:10px;fill:#7E57C2">clé violette</text><circle cx="802" cy="332" r="6.5" fill="none" stroke="#7E57C2" stroke-width="2.5"/><circle cx="802" cy="332" r="2.2" fill="#7E57C2"/><line x1="808" y1="332" x2="824" y2="332" stroke="#7E57C2" stroke-width="2.5"/><line x1="817" y1="332" x2="817" y2="338" stroke="#7E57C2" stroke-width="2.5"/><line x1="822" y1="332" x2="822" y2="339" stroke="#7E57C2" stroke-width="2.5"/><text x="846" y="337" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;fill:var(--ink3)">≠</text><rect x="862" y="323" width="22" height="17" rx="3" fill="#0E8C99" fill-opacity="0.14" stroke="#0E8C99" stroke-width="2"/><path d="M866,323 V318 a7,7 0 0,1 14,0 V323" fill="none" stroke="#0E8C99" stroke-width="2.5"/><circle cx="873.0" cy="331" r="2" fill="#0E8C99"/><text x="848" y="378" text-anchor="middle" style="font-family:'Open Sans',sans-serif;font-size:15px;font-weight:800;fill:#D64545">✗ ÉCHEC</text><text x="848" y="398" text-anchor="middle" style="font-family:'IBM Plex Mono',monospace;font-size:9px;fill:#D64545">AP_ERR_MODIFIED</text></svg>
+        </div>
+        <div class="sh-foot">
+          Le SPN est porté par un <b>compte de service ou gMSA</b> (<code>svc-vip$</code>), pas par une machine. Le ticket est scellé avec une clé (sarcelle) qu'<b>aucun</b> backend ne possède&nbsp;: les 5 hôtes n'ont que leur propre clé machine. Résultat <b>0/5</b>, repli NTLM systématique. Paradoxalement plus « stable » que le schéma 1… mais Kerberos n'aboutit <b>jamais</b>.
+        </div>
+      </div>
+
+    </div>
+
+    <div style="display:flex;gap:10px 14px;flex-wrap:wrap;align-items:center;margin-top:16px">
+      <span class="keychip" style="--kc:#1FA45A"><span class="dot"></span>vert = clé de MachineDest-A</span>
+      <span class="keychip" style="--kc:#2D7DD2"><span class="dot"></span>bleu = MachineDest-B</span>
+      <span class="keychip" style="--kc:#E08A2B"><span class="dot"></span>ambre = MachineDest-C</span>
+      <span class="keychip" style="--kc:#D64545"><span class="dot"></span>rouge = MachineDest-D</span>
+      <span class="keychip" style="--kc:#7E57C2"><span class="dot"></span>violet = MachineDest-E</span>
+      <span class="keychip" style="--kc:#0E8C99"><span class="dot"></span>sarcelle = compte de service / gMSA (hors pool)</span>
+    </div>
+    <p class="hint" style="margin:10px 2px 0">Règle : un cadenas a la couleur de la clé qui l'a fermé, et il ne s'ouvre qu'avec une clé de la <b>même</b> couleur. Le F5 (niveau 4) <b>ignore ces couleurs</b> — il distribue selon la persistance réseau. D'où <b>1/5</b> (schéma 1, SPN sur un backend) ou <b>0/5</b> (schéma 2, SPN hors pool).</p>
+
+    <div class="subh">À retenir</div>
+    <div class="cards">
+      <div class="card">
+        <div class="cn">LE NOM</div>
+        <h3>Une consigne, pas une adresse</h3>
+        <p><code>TERMSRV/VIp-coop</code> dit seulement au KDC <b>quelle clé</b> utiliser pour fermer le ticket. Le serveur qui reçoit ne s'en sert pas pour décider : il tente sa propre clé.</p>
+      </div>
+      <div class="card warn">
+        <div class="cn">LA CLÉ</div>
+        <h3>Elle ne se partage pas</h3>
+        <p>Chaque machine garde sa clé. Un ticket fermé avec la clé de A ne s'ouvre que chez A. Sur B, autre clé → <code>AP_ERR_MODIFIED</code>, même nom inscrit.</p>
+      </div>
+      <div class="card alt">
+        <div class="cn">DONC, AVEC 5 BACKENDS</div>
+        <h3>1/5 si dans le pool, 0/5 sinon</h3>
+        <p>Le SPN est unique → une seule clé. SPN sur un backend → Kerberos n'aboutit que pour lui (<b>1/5</b>, intermittent) ; SPN hors pool → <b>0/5</b>, NTLM systématique. Pour un Kerberos fiable : <b>RD Connection Broker</b> ou <b>APM + KCD</b>.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span>CA-GIP · schéma pédagogique — authentification RDP</span>
+    <span>Kerberos exige que le nom appelé corresponde à une clé déchiffrable par l'hôte qui répond.</span>
+  </footer>
+</div>
+
+<script>
+/* ===================== STEPPER DATA ===================== */
+const TONES={cyan:'var(--cyan)',violet:'var(--violet)',gold:'var(--gold)',red:'var(--red)',green:'var(--green)',amber:'var(--amber)'};
+const ALLNODES=['n-client','n-f5','n-kdc','n-hostA','n-hostB','n-hostC','n-hostD','n-hostE'];
+const ALLLINKS=['lk-kerb','lk-tgs','lk-tcp','lk-relay'];
+const ALLANNO=['an-port','an-issue','an-relay','an-perceive','an-modified','an-match'];
+const POOL=['n-hostA','n-hostB','n-hostC','n-hostD','n-hostE'];
+
+const STEPS=[
+ { tone:'cyan', badge:'Requête', phase:'Client → KDC · port 88',
+   lead:`SSPI demande au KDC un ticket de service pour <code>TERMSRV/VIp-coop</code> — le SPN existe désormais.`,
+   tech:`L'échange Kerberos passe sur le port <code>88</code>, sur un canal distinct du tunnel RDP. Le client demande à parler à <code>TERMSRV/VIp-coop.zres.ztech</code>. Comme nous avons <b>créé ce SPN</b>, le KDC va cette fois pouvoir répondre — contrairement au scénario « sans SPN ».`,
+   nodes:['n-client','n-kdc'], links:['lk-kerb'], anno:['an-port'], packet:{path:'pp-kerb',rev:false} },
+
+ { tone:'gold', badge:'Émission', phase:'KDC · SPN trouvé → ticket scellé',
+   lead:`Le KDC trouve le SPN sur son <b>unique</b> compte porteur et scelle le ticket avec <b>la clé de ce compte</b>.`,
+   tech:`<code>servicePrincipalName</code> est résolu → un seul compte. La <i>enc-part</i> (clé de session + PAC) est chiffrée avec la clé long-terme de ce compte. Dans notre exemple, le SPN a été posé sur la machine <b>MachineDest-A</b> : le ticket est donc « vert » (clé de A).`,
+   key:{type:'',html:`<b>Point clé</b> — le ticket existe maintenant, mais il est scellé à <i>une</i> clé précise (celle de A). Retenez cette couleur.`},
+   nodes:['n-kdc','n-client','n-hostA'], links:['lk-tgs'], anno:['an-issue'], packet:{path:'pp-tgs',rev:false}, good:['n-hostA'] },
+
+ { tone:'cyan', badge:'Présentation', phase:'Client → F5 (L4) → backend',
+   lead:`Le client ouvre TLS vers la VIP et présente l'AP-REQ. Le F5 relaie les octets vers <b>un</b> backend du pool de 5.`,
+   tech:`En pur niveau 4, le F5 choisit un backend selon la persistance réseau (source-address / round-robin), <b>pas</b> selon le SPN. L'AP-REQ voyage <b>à l'intérieur du tunnel TLS/CredSSP</b>. Ici, le F5 a relayé vers <b>MachineDest-C</b>.`,
+   nodes:['n-client','n-f5','n-hostA','n-hostB','n-hostC','n-hostD','n-hostE'], links:['lk-tcp','lk-relay'], anno:['an-relay'], packet:{path:'pp-relay',rev:false} },
+
+ { tone:'violet', badge:'Perception backend', phase:'L\'hôte tente d\'ouvrir',
+   lead:`Le backend qui reçoit (<b>MachineDest-C</b>) essaie d'ouvrir l'AP-REQ avec <b>SA propre clé machine</b>.`,
+   tech:`Côté serveur, la preuve d'identité <i>est</i> ce déchiffrement. C ne lit pas le nom inscrit : il tente sa clé machine (LocalSystem). En parallèle, le backend fait son <b>ménage Kerberos/LDAP</b> habituel vers le DC, visible en clair (voir la capture « côté backend » plus bas).`,
+   key:{type:'',html:`<b>Point clé</b> — le ticket est « vert » (clé de A) mais C présente une clé « orange ». Le nom <code>TERMSRV/VIp-coop</code> n'aide en rien C à ouvrir.`},
+   nodes:['n-hostC'], links:['lk-relay'], anno:['an-perceive'], packet:{path:'pp-relay',rev:false} },
+
+ { tone:'red', badge:'Échec — 4 sur 5', phase:'Clé ≠ → AP_ERR_MODIFIED',
+   lead:`La clé de C diffère de celle qui a scellé le ticket → déchiffrement impossible.`,
+   tech:`Résultat <code>KRB5KRB_AP_ERR_MODIFIED</code>, généré <b>par le backend</b>, <b>à l'intérieur de TLS</b> (donc opaque sur le fil ; lisible dans le journal d'événements du serveur). Le client bascule alors en <b>NTLMv2</b> dans le même tunnel. C'est le sort de <b>4 backends sur 5</b>.`,
+   key:{type:'warn',html:`<b>Point clé</b> — l'erreur n'est <u>pas</u> en clair côté client : le TGS-REP a <i>réussi</i>, puis tout devient opaque (TLS). Seul le backend (ou le déchiffrement TLS) révèle l'échec.`},
+   nodes:['n-hostC'], links:['lk-relay'], anno:['an-modified'], packet:{path:'pp-relay',rev:false}, bad:['n-hostC'] },
+
+ { tone:'green', badge:'Le seul qui marche — 1 sur 5', phase:'Si le F5 atterrit sur A',
+   lead:`Si — et seulement si — le F5 relaie vers <b>MachineDest-A</b> (porteur du SPN), la clé correspond → Kerberos aboutit.`,
+   tech:`A possède la clé « verte » qui a scellé le ticket → il ouvre l'AP-REQ → logon Kerberos (event <code>4624</code>). Mais le F5 ne le garantit pas : statistiquement <b>~1 connexion sur 5</b>. D'où un comportement <b>intermittent</b> — le pire pour diagnostiquer.`,
+   key:{type:'ok',html:`<b>Point clé</b> — ça « marche parfois » : uniquement quand la persistance du F5 envoie pile sur A. Sur les 4 autres → <code>AP_ERR_MODIFIED</code> + repli NTLM.`},
+   nodes:['n-hostA'], links:[], anno:['an-match'], packet:{path:'pp-relayA',rev:false}, good:['n-hostA'] },
+
+ { tone:'amber', badge:'Variante — hors pool', phase:'SPN sur un compte de service / gMSA',
+   lead:`Si on pose plutôt le SPN sur un compte <b>hors des 5</b> (service / gMSA), <b>aucun</b> backend ne peut ouvrir → <b>0/5</b>.`,
+   tech:`Le ticket serait scellé avec la clé du compte de service. Or les 5 backends n'ont que leur clé machine (LocalSystem) — <b>jamais</b> celle du gMSA. Échec systématique sur tout le pool (<code>AP_ERR_MODIFIED</code> partout), puis repli NTLM. Paradoxalement plus « stable » que le cas A… mais Kerberos n'aboutit <b>jamais</b>.`,
+   key:{type:'warn',html:`<b>Point clé</b> — gMSA / compte de service ne sauve pas RDP : TermService ouvre avec l'identité <b>machine</b>, pas celle du gMSA.`},
+   nodes:['n-hostA','n-hostB','n-hostC','n-hostD','n-hostE'], links:['lk-relay'], anno:['an-modified'], packet:{path:'pp-relay',rev:false}, bad:['n-hostA','n-hostB','n-hostC','n-hostD','n-hostE'] },
+
+ { tone:'red', badge:'Conclusion', phase:'Verdict',
+   lead:`SPN créé + VIP L4 + pool de 5 → Kerberos est au mieux <b>intermittent (1/5)</b>, au pire <b>nul (0/5)</b>. Non supporté.`,
+   tech:`Créer le SPN ne résout rien : posé sur un backend → ça marche 1 fois sur 5 (flaky) ; posé hors pool → 0/5. Pour un Kerberos fiable : <b>backend unique</b>, passerelle <b>APM + KCD (S4U2Proxy)</b>, ou <b>RD Connection Broker</b>. Sinon, le repli NTLMv2 reste la voie qui « fonctionne » (au prix de la délégation, du SSO, etc.).`,
+   key:{type:'warn',html:`<b>⚠ Non supporté / intermittent.</b> Voir « Les seules issues » plus bas.`},
+   nodes:[], links:[], anno:[], packet:{path:'pp-relay',rev:false} },
+];
+const SHORT=['Requête','Émission','Présentation','Perception','Échec 4/5','OK 1/5','Hors pool','Verdict'];
+
+/* ===================== STATE & ELEMENTS ===================== */
+let i=0, playing=true, timer=null, rafId=null;
+const app=document.getElementById('app');
+const svg=document.getElementById('map');
+const packet=document.getElementById('packet');
+const panel=document.querySelector('.panel');
+const DUR=5200;
+
+/* timeline */
+const track=document.getElementById('track');
+SHORT.forEach((s,idx)=>{
+  const seg=document.createElement('button');
+  seg.className='seg'; seg.innerHTML='<span class="sn">0'+(idx+1)+'</span><span class="sl">'+s+'</span>';
+  seg.addEventListener('click',()=>{ go(idx); pause(); });
+  track.appendChild(seg);
+});
+const segs=[...track.children];
+
+/* packet animation */
+function runPacket(pathId,reverse,color){
+  cancelAnimationFrame(rafId);
+  const path=document.getElementById(pathId);
+  if(!path){ packet.style.opacity=0; return; }
+  const len=path.getTotalLength();
+  packet.setAttribute('fill',color); packet.style.color=color;
+  let start=null; const cyc=1700;
+  function frame(ts){
+    if(start===null) start=ts;
+    const t=((ts-start)%cyc)/cyc;
+    const d=reverse?(1-t):t;
+    const p=path.getPointAtLength(d*len);
+    packet.setAttribute('cx',p.x.toFixed(1));
+    packet.setAttribute('cy',p.y.toFixed(1));
+    const edge=Math.min(t,1-t);
+    packet.style.opacity=Math.min(1,edge*7+0.12).toFixed(2);
+    rafId=requestAnimationFrame(frame);
+  }
+  rafId=requestAnimationFrame(frame);
+}
+
+/* render */
+function render(){
+  const s=STEPS[i];
+  const tone=TONES[s.tone];
+  svg.style.setProperty('--tone',tone);
+  panel.style.setProperty('--tone',tone);
+
+  document.getElementById('pIdx').textContent=String(i+1).padStart(2,'0')+' / '+String(STEPS.length).padStart(2,'0');
+  const badge=document.getElementById('pBadge'); badge.textContent=s.badge; badge.style.setProperty('--tone',tone);
+  document.getElementById('pPhase').textContent=s.phase;
+  document.getElementById('pLead').innerHTML=s.lead;
+  document.getElementById('pTech').innerHTML=s.tech;
+  const k=document.getElementById('pKey');
+  if(s.key){ k.hidden=false; k.className='key '+(s.key.type||''); k.innerHTML=s.key.html; } else { k.hidden=true; }
+
+  ALLNODES.forEach(n=>{
+    const el=document.getElementById(n);
+    el.classList.toggle('on',s.nodes.includes(n));
+    el.classList.toggle('dim',!s.nodes.includes(n));
+    el.classList.toggle('bad',!!(s.bad&&s.bad.includes(n)));
+    el.classList.toggle('good',!!(s.good&&s.good.includes(n)));
+  });
+  ALLLINKS.forEach(l=>document.getElementById(l).classList.toggle('on',s.links.includes(l)));
+  ALLANNO.forEach(a=>document.getElementById(a).classList.toggle('show',s.anno.includes(a)));
+
+  runPacket(s.packet.path,s.packet.rev,tone);
+
+  segs.forEach((seg,idx)=>{ seg.classList.toggle('active',idx===i); seg.classList.toggle('done',idx<i); if(idx===i) seg.style.setProperty('--tone',tone); });
+}
+
+/* nav */
+function go(n){ i=(n+STEPS.length)%STEPS.length; render(); schedule(); }
+function next(){ go(i+1); } function prev(){ go(i-1); }
+function schedule(){ clearTimeout(timer); if(playing) timer=setTimeout(()=>go(i+1),DUR); }
+function setPlay(v){ playing=v; document.getElementById('playBtn').textContent=playing?'⏸':'▶'; schedule(); }
+function pause(){ setPlay(false); }
+document.getElementById('nextBtn').onclick=()=>{ next(); pause(); };
+document.getElementById('prevBtn').onclick=()=>{ prev(); pause(); };
+document.getElementById('playBtn').onclick=()=>setPlay(!playing);
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'){ next(); pause(); e.preventDefault(); }
+  else if(e.key==='ArrowLeft'){ prev(); pause(); e.preventDefault(); }
+  else if(e.key===' '){ setPlay(!playing); e.preventDefault(); }
+});
+
+/* toggles */
+document.getElementById('techBtn').onclick=function(){ app.classList.toggle('show-tech'); this.classList.toggle('on',app.classList.contains('show-tech')); };
+document.getElementById('themeBtn').onclick=()=>{ const r=document.documentElement; r.dataset.theme = r.dataset.theme==='dark'?'light':'dark'; render(); };
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) clearTimeout(timer); else schedule(); });
+
+/* ===================== ENCRYPTION EXPLAINER ===================== */
+const SCEN=[
+ { id:'mono', tab:'Backend unique ✓', pass:true,
+   lockKey:['#1FA45A','clé : compte machine de l\'unique hôte'],
+   hostKey:['#1FA45A','clé : le même compte machine'],
+   transit:['vers l\'unique hôte','le seul « backend »'],
+   mark:'✓', txt:'Le host déchiffre le ticket', err:'', vc:'var(--green)',
+   note:'Le SPN est posé sur le compte machine de cet hôte unique : il possède la clé qui a verrouillé. Plus de pool, donc plus d\'ambiguïté.',
+   match:'<b>clé du verrou</b> <span class="eq">=</span> <b>clé de l\'hôte</b> → ticket ouvert' },
+
+ { id:'poolHost', tab:'SPN sur 1 backend du pool — notre cas', pass:false,
+   lockKey:['#1FA45A','clé : MachineDest-A (porte le SPN)'],
+   hostKey:['#E08A2B','clé : MachineDest-C (a répondu, 1 des 5)'],
+   transit:['vers 1 backend sur 5','persistance réseau, pas Kerberos'],
+   mark:'✗', txt:'C ne peut pas déchiffrer (4/5)', err:'KRB5KRB_AP_ERR_MODIFIED', vc:'var(--red)',
+   note:'Le SPN, unique, vit sur A. Le F5 a relayé vers C, dont la clé machine diffère. Ça n\'aboutit que si le F5 tombe pile sur A (~1/5) — d\'où l\'intermittence.',
+   match:'<b>clé du verrou (A)</b> <span class="neq">≠</span> <b>clé de l\'hôte (C)</b> → échec (sauf si l\'hôte = A)' },
+
+ { id:'svc', tab:'SPN hors pool (svc / gMSA) ✗', pass:false,
+   lockKey:['#0E8C99','clé : compte de service / gMSA'],
+   hostKey:['#E08A2B','clé : compte machine (LocalSystem)'],
+   transit:['vers n\'importe quel backend','0/5 possèdent cette clé'],
+   mark:'✗', txt:'Aucun des 5 n\'ouvre (0/5)', err:'AP_ERR_MODIFIED partout', vc:'var(--red)',
+   note:'Le KDC chiffrerait avec la clé du gMSA, mais RDP authentifie avec l\'identité MACHINE. Aucun des 5 backends n\'a la clé du gMSA → échec systématique.',
+   match:'<b>clé du verrou (gMSA)</b> <span class="neq">≠</span> <b>clé machine</b> → échec sur tout le pool' },
+
+ { id:'nospn', tab:'Aucun SPN (ancien état)', pass:false,
+   lockKey:['var(--ink3)','aucune clé — pas de verrou'],
+   hostKey:['var(--ink3)','— rien à ouvrir'],
+   transit:['—','le KDC n\'a rien émis'],
+   mark:'∅', txt:'Aucun ticket n\'est émis', err:'KDC_ERR_S_PRINCIPAL_UNKNOWN (7)', vc:'var(--amber)',
+   note:'Pour mémoire : avant la création du SPN, le KDC refusait en amont (erreur 7). Depuis qu\'on l\'a créé, on bascule désormais dans les cas ci-dessus.',
+   match:'pas de SPN → <b>pas de ticket</b> → SSPI bascule (NTLMv2)' },
+];
+
+const tabsEl=document.getElementById('tabs');
+const encStage=document.getElementById('encStage');
+SCEN.forEach((sc,idx)=>{
+  const b=document.createElement('button');
+  b.className='tab '+(sc.pass?'pass':'fail'); b.textContent=sc.tab; b.dataset.i=idx;
+  b.onclick=()=>setScen(idx);
+  tabsEl.appendChild(b);
+});
+const tabBtns=[...tabsEl.children];
+
+function setScen(idx){
+  const sc=SCEN[idx];
+  tabBtns.forEach((b,k)=>b.classList.toggle('on',k===idx));
+  // lock
+  document.getElementById('lockSvg').style.setProperty('--kc',sc.lockKey[0]);
+  document.getElementById('lockKey').style.setProperty('--kc',sc.lockKey[0]);
+  document.getElementById('lockKeyTxt').textContent=sc.lockKey[1];
+  // transit
+  document.getElementById('transitWho').textContent=sc.transit[0];
+  document.getElementById('transitSub').textContent=sc.transit[1];
+  // verdict
+  const v=document.getElementById('vcell'); v.style.setProperty('--vc',sc.vc);
+  document.getElementById('vMark').textContent=sc.mark;
+  document.getElementById('vTxt').textContent=sc.txt;
+  document.getElementById('hostKey').style.setProperty('--kc',sc.hostKey[0]);
+  document.getElementById('hostKeyTxt').textContent=sc.hostKey[1];
+  document.getElementById('vErr').textContent=sc.err;
+  document.getElementById('vNote').textContent=sc.note;
+  document.getElementById('matchLine').innerHTML=sc.match;
+  // lock open / fail animation
+  encStage.dataset.open=sc.pass?'1':'0';
+  encStage.dataset.fail='0';
+  if(!sc.pass && sc.id!=='nospn'){ void encStage.offsetWidth; encStage.dataset.fail='1'; }
+}
+
+/* ===================== INIT ===================== */
+render(); setPlay(true); setScen(1);
+</script>
+</body>
+</html>

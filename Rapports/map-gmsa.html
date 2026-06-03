@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analyse : compte de service partagé (gMSA) pour RDP Kerberos en pool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F3F7F5;--bg2:#EBF1EE;--panel:#FFFFFF;--panel2:#F5FAF7;--panel3:#EAF2ED;
+  --line:#CAE0D4;--line2:#B2CFC2;--line3:#8FB5A5;
+  --ink:#10261E;--ink2:#375E50;--ink3:#6F9885;
+  --gold:#00843D;--cyan:#005A38;--violet:#3D6FA8;--green:#186C35;--red:#C23030;--amber:#B26A0C;
+  --tone:var(--cyan);
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --sans:'Open Sans',system-ui,sans-serif;
+  --shadow:0 4px 22px -8px rgba(0,90,56,.16);
+  --teal:#0E8C99;
+}
+[data-theme="dark"]{
+  --bg:#0C1714;--bg2:#0F1C18;--panel:#12211C;--panel2:#16271F;--panel3:#1B2F26;
+  --line:#284A3C;--line2:#356152;--line3:#4E8270;
+  --ink:#EAF3EE;--ink2:#A8C7B9;--ink3:#6F9885;
+  --gold:#1FBF66;--cyan:#37C98C;--violet:#6FA3DC;--green:#37C98C;--red:#E5736B;--amber:#D69838;
+  --shadow:0 12px 34px -14px rgba(0,0,0,.65);
+  --teal:#1FC4D4;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);line-height:1.62;font-size:15px;padding:0 0 48px}
+
+/* === LAYOUT === */
+.wrap{max-width:980px;margin:0 auto;padding:0 22px}
+header{background:var(--panel);border-bottom:3px solid var(--gold);padding:32px 22px 28px;text-align:center}
+header h1{font-size:clamp(20px,3.2vw,28px);font-weight:800;margin-bottom:6px}
+header .sub{font-family:var(--mono);font-size:13px;color:var(--ink2);margin-bottom:16px}
+.badge{display:inline-block;padding:6px 18px;border-radius:100px;font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:.3px}
+.badge.fail{background:var(--red);color:#fff}
+.badge.ok{background:var(--green);color:#fff}
+.badge.warn{background:var(--amber);color:#fff}
+
+section{margin:36px auto 0;max-width:980px;padding:0 22px}
+.subh{font-family:var(--mono);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1.8px;color:var(--gold);margin:38px 0 16px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+p.lead{font-size:16px;color:var(--ink2);line-height:1.7;margin-bottom:18px}
+b{font-weight:700}
+code{font-family:var(--mono);font-size:12.5px;background:var(--panel3);padding:1px 6px;border-radius:4px}
+
+/* === CARDS === */
+.cards{display:grid;gap:14px;margin-bottom:8px}
+.cards.c3{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+.card{background:var(--panel);border-radius:14px;padding:22px 20px;border-left:4px solid var(--gold);box-shadow:var(--shadow)}
+.card .cn{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink3);margin-bottom:6px}
+.card h3{font-size:15px;font-weight:700;margin-bottom:8px}
+.card p{font-size:14px;color:var(--ink2);line-height:1.65}
+.card.ok{border-left-color:var(--green)}
+.card.warn{border-left-color:var(--amber)}
+.card.fail{border-left-color:var(--red)}
+.card.alt{border-left-color:var(--violet)}
+
+/* === STEPS === */
+.steps{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-bottom:10px}
+.step{background:var(--panel);border-radius:14px;padding:18px 18px 16px;border:2px solid var(--line);cursor:pointer;transition:border-color .2s,box-shadow .2s;position:relative}
+.step:hover{border-color:var(--line3)}
+.step.active{border-color:var(--gold);box-shadow:0 0 0 3px rgba(0,132,61,.12)}
+.step.active.is-fail{border-color:var(--red);box-shadow:0 0 0 3px rgba(194,48,48,.12)}
+.step .snum{font-family:var(--mono);font-weight:600;font-size:11px;color:var(--ink3);margin-bottom:4px}
+.step .stitle{font-size:14px;font-weight:700;line-height:1.4}
+.step .stag{position:absolute;top:14px;right:14px;font-family:var(--mono);font-size:19px}
+.step-detail{background:var(--panel2);border-radius:14px;padding:24px 22px;margin-top:14px;min-height:86px;transition:background .2s;border:1px solid var(--line)}
+.step-detail.is-fail{border-color:var(--red);border-width:2px;background:color-mix(in srgb,var(--red) 4%,var(--panel2))}
+.step-detail h4{font-size:14px;font-weight:700;margin-bottom:8px}
+.step-detail p{font-size:13.5px;color:var(--ink2);line-height:1.65}
+
+/* === COMPARISON === */
+.vs{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:20px 0}
+@media(max-width:680px){.vs{grid-template-columns:1fr}}
+.vs-panel{border-radius:16px;padding:22px 20px;text-align:center}
+.vs-panel.good{background:color-mix(in srgb,var(--green) 7%,var(--panel));border:2px solid var(--green)}
+.vs-panel.bad{background:color-mix(in srgb,var(--red) 7%,var(--panel));border:2px solid var(--red)}
+.vs-panel h3{font-size:15px;font-weight:700;margin-bottom:4px}
+.vs-panel .vlab{font-family:var(--mono);font-size:11px;color:var(--ink3);margin-bottom:12px}
+.vs-panel svg{width:100%;height:auto;display:block;margin-bottom:12px}
+.vs-panel .verdict{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.3px}
+.vs-panel.good .verdict{color:var(--green)}
+.vs-panel.bad .verdict{color:var(--red)}
+
+/* === SCHEMA (5 backends) === */
+.schema-wrap{background:var(--panel);border-radius:16px;padding:20px 18px;box-shadow:var(--shadow);margin:18px 0}
+.schema-wrap svg{width:100%;height:auto;display:block}
+.schema-wrap svg .box{fill:var(--panel2);stroke:var(--line3);stroke-width:1.6;rx:10}
+.schema-wrap svg .nm{font-family:var(--sans);font-weight:700;fill:var(--ink)}
+.schema-wrap svg .role{font-family:var(--mono);fill:var(--ink3)}
+.schema-foot{font-size:13px;color:var(--ink2);line-height:1.65;margin-top:14px;padding:0 4px}
+
+/* === MISC === */
+.keychips{display:flex;gap:10px 14px;flex-wrap:wrap;align-items:center;margin:16px 0}
+.keychip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--ink2)}
+.keychip .dot{width:12px;height:12px;border-radius:50%;background:var(--kc);flex-shrink:0}
+.hint{font-size:12.5px;color:var(--ink3);font-family:var(--mono);line-height:1.6;margin:8px 0 0}
+.hl{background:linear-gradient(transparent 55%,rgba(0,132,61,.12) 55%)}
+.top-bar{display:flex;justify-content:flex-end;gap:8px;padding:10px 22px 0;max-width:980px;margin:0 auto}
+.tbtn{background:var(--panel3);border:1px solid var(--line2);border-radius:8px;padding:5px 14px;font-family:var(--mono);font-size:11px;color:var(--ink2);cursor:pointer;transition:background .2s}
+.tbtn:hover{background:var(--line)}
+
+.footer{text-align:center;padding:32px 22px;margin-top:40px;border-top:2px solid var(--line);max-width:980px;margin-left:auto;margin-right:auto}
+.footer .quote{font-size:17px;font-weight:700;color:var(--ink);margin-bottom:6px}
+.footer .attrib{font-family:var(--mono);font-size:12px;color:var(--ink3)}
+
+.note-box{background:var(--panel2);border:1px solid var(--line2);border-radius:12px;padding:16px 18px;margin:16px 0;font-size:13.5px;color:var(--ink2);line-height:1.65}
+.note-box b{color:var(--ink)}
+
+a{color:var(--gold);text-decoration:none}
+a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <button class="tbtn" id="themeBtn" onclick="toggleTheme()">🌙 Sombre</button>
+</div>
+
+<!-- ============ HEADER ============ -->
+<header>
+  <h1>Proposition : compte de service partagé (gMSA) pour RDP Kerberos</h1>
+  <div class="sub">VIp-coop.zres.ztech · F5 L4 · pool de 5 RDSH · Kerberos end-to-end</div>
+  <span class="badge fail">❌ non applicable à TermService</span>
+</header>
+
+<!-- ============ INTRO ============ -->
+<section>
+  <p class="lead">
+    L'architecte propose de créer un <b>compte de service partagé</b> (gMSA), d'y poser le SPN de la VIP, et de faire tourner TermService sous ce compte sur chaque backend — afin que tous partagent une même clé Kerberos. Le raisonnement est <b>exactement le bon modèle</b> pour les services en ferme (IIS, SharePoint, SQL). <span class="hl">Le problème est que TermService est le seul service Windows courant où ce levier n'existe pas.</span>
+  </p>
+</section>
+
+<!-- ============ LES 6 ÉTAPES ============ -->
+<section>
+  <div class="subh">La proposition en 6 étapes</div>
+  <p style="font-size:14px;color:var(--ink2);margin-bottom:16px">Cliquez sur une étape pour voir l'analyse.</p>
+  <div class="steps" id="stepGrid">
+    <div class="step active" data-s="0"><span class="snum">ÉTAPE 1</span><span class="stag">✅</span><div class="stitle">Créer un groupe contenant les objets machines</div></div>
+    <div class="step" data-s="1"><span class="snum">ÉTAPE 2</span><span class="stag">✅</span><div class="stitle">Créer un compte de service dédié (gMSA)</div></div>
+    <div class="step" data-s="2"><span class="snum">ÉTAPE 3</span><span class="stag">✅</span><div class="stitle">Ajouter le SPN de la VIP au compte</div></div>
+    <div class="step" data-s="3"><span class="snum">ÉTAPE 4</span><span class="stag">✅</span><div class="stitle">« Ouvrir une session en tant que service »</div></div>
+    <div class="step" data-s="4"><span class="snum">ÉTAPE 5</span><span class="stag">✅</span><div class="stitle">Install-ADServiceAccount sur chaque serveur</div></div>
+    <div class="step is-fail" data-s="5"><span class="snum">ÉTAPE 6</span><span class="stag">❌</span><div class="stitle">Configurer TermService pour utiliser le gMSA</div></div>
+  </div>
+  <div class="step-detail" id="stepDetail"></div>
+</section>
+
+<!-- ============ MODÈLE STANDARD ============ -->
+<section>
+  <div class="subh">Pourquoi c'est le bon réflexe — en général</div>
+  <p class="lead">
+    Le modèle <b>compte de service partagé + SPN sur ce compte</b> est la recette officielle de Microsoft pour Kerberos derrière un load-balancer. Le SPN doit être unique → il doit vivre sur <b>un seul</b> compte → tous les nœuds doivent tourner sous ce compte pour partager la clé de déchiffrement. C'est comme ça qu'on authentifie en Kerberos une ferme IIS, SharePoint, SQL Server…
+  </p>
+
+  <div class="vs">
+    <!-- IIS: ça marche -->
+    <div class="vs-panel good">
+      <h3>Ferme IIS / SharePoint</h3>
+      <div class="vlab">AppPool = svc-app sur tous les nœuds</div>
+      <svg viewBox="0 0 340 260" aria-label="Schéma IIS: clé partagée, tous déchiffrent">
+        <rect class="box" x="100" y="4" width="140" height="42" rx="10"/>
+        <text class="nm" x="170" y="22" font-size="11" text-anchor="middle">KDC</text>
+        <text class="role" x="170" y="38" font-size="8.5" text-anchor="middle">scelle avec clé de svc-app</text>
+        <line x1="170" y1="46" x2="170" y2="70" stroke="var(--line3)" stroke-width="1.4"/>
+        <rect x="120" y="72" width="100" height="34" rx="8" fill="var(--panel2)" stroke="var(--gold)" stroke-width="2"/>
+        <text x="170" y="94" font-size="10" text-anchor="middle" font-family="var(--mono)" fill="var(--gold)" font-weight="600">🔒 ticket OR</text>
+        <line x1="170" y1="106" x2="170" y2="124" stroke="var(--line3)" stroke-width="1.4"/>
+        <rect class="box" x="120" y="126" width="100" height="28" rx="8"/>
+        <text class="nm" x="170" y="144" font-size="10" text-anchor="middle">F5 · VIP (L4)</text>
+        <path d="M170,154 L68,186" stroke="var(--line3)" stroke-width="1.2"/>
+        <path d="M170,154 L170,186" stroke="var(--line3)" stroke-width="1.2"/>
+        <path d="M170,154 L272,186" stroke="var(--line3)" stroke-width="1.2"/>
+        <g>
+          <rect x="20" y="188" width="96" height="58" rx="10" fill="var(--panel2)" stroke="var(--gold)" stroke-width="2"/>
+          <text x="68" y="207" font-size="9" text-anchor="middle" font-family="var(--sans)" font-weight="700" fill="var(--ink)">Nœud 1</text>
+          <text x="68" y="221" font-size="8" text-anchor="middle" font-family="var(--mono)" fill="var(--gold)">🔑 clé OR</text>
+          <text x="68" y="240" font-size="16" text-anchor="middle" fill="var(--green)">✓</text>
+        </g>
+        <g>
+          <rect x="122" y="188" width="96" height="58" rx="10" fill="var(--panel2)" stroke="var(--gold)" stroke-width="2"/>
+          <text x="170" y="207" font-size="9" text-anchor="middle" font-family="var(--sans)" font-weight="700" fill="var(--ink)">Nœud 2</text>
+          <text x="170" y="221" font-size="8" text-anchor="middle" font-family="var(--mono)" fill="var(--gold)">🔑 clé OR</text>
+          <text x="170" y="240" font-size="16" text-anchor="middle" fill="var(--green)">✓</text>
+        </g>
+        <g>
+          <rect x="224" y="188" width="96" height="58" rx="10" fill="var(--panel2)" stroke="var(--gold)" stroke-width="2"/>
+          <text x="272" y="207" font-size="9" text-anchor="middle" font-family="var(--sans)" font-weight="700" fill="var(--ink)">Nœud 3</text>
+          <text x="272" y="221" font-size="8" text-anchor="middle" font-family="var(--mono)" fill="var(--gold)">🔑 clé OR</text>
+          <text x="272" y="240" font-size="16" text-anchor="middle" fill="var(--green)">✓</text>
+        </g>
+      </svg>
+      <div class="verdict">Kerberos : 3/3 ✓</div>
+    </div>
+
+    <!-- RDP: ça échoue -->
+    <div class="vs-panel bad">
+      <h3>Ferme RDP (TermService)</h3>
+      <div class="vlab">TermService = NetworkService (identité machine)</div>
+      <svg viewBox="0 0 340 260" aria-label="Schéma RDP: clé machine ≠ clé gMSA, aucun ne déchiffre">
+        <rect class="box" x="100" y="4" width="140" height="42" rx="10"/>
+        <text class="nm" x="170" y="22" font-size="11" text-anchor="middle">KDC</text>
+        <text class="role" x="170" y="38" font-size="8.5" text-anchor="middle">scelle avec clé de svc-vip</text>
+        <line x1="170" y1="46" x2="170" y2="70" stroke="var(--line3)" stroke-width="1.4"/>
+        <rect x="114" y="72" width="112" height="34" rx="8" fill="var(--panel2)" stroke="var(--teal)" stroke-width="2"/>
+        <text x="170" y="94" font-size="10" text-anchor="middle" font-family="var(--mono)" fill="var(--teal)" font-weight="600">🔒 ticket TEAL</text>
+        <line x1="170" y1="106" x2="170" y2="124" stroke="var(--line3)" stroke-width="1.4"/>
+        <rect class="box" x="120" y="126" width="100" height="28" rx="8"/>
+        <text class="nm" x="170" y="144" font-size="10" text-anchor="middle">F5 · VIP (L4)</text>
+        <path d="M170,154 L68,186" stroke="var(--line3)" stroke-width="1.2"/>
+        <path d="M170,154 L170,186" stroke="var(--line3)" stroke-width="1.2"/>
+        <path d="M170,154 L272,186" stroke="var(--line3)" stroke-width="1.2"/>
+        <g>
+          <rect x="20" y="188" width="96" height="58" rx="10" fill="var(--panel2)" stroke="#1FA45A" stroke-width="2"/>
+          <text x="68" y="207" font-size="9" text-anchor="middle" font-family="var(--sans)" font-weight="700" fill="var(--ink)">RDSH-A</text>
+          <text x="68" y="221" font-size="8" text-anchor="middle" font-family="var(--mono)" fill="#1FA45A">🔑 clé VERTE</text>
+          <text x="68" y="240" font-size="16" text-anchor="middle" fill="var(--red)">✗</text>
+        </g>
+        <g>
+          <rect x="122" y="188" width="96" height="58" rx="10" fill="var(--panel2)" stroke="#2D7DD2" stroke-width="2"/>
+          <text x="170" y="207" font-size="9" text-anchor="middle" font-family="var(--sans)" font-weight="700" fill="var(--ink)">RDSH-B</text>
+          <text x="170" y="221" font-size="8" text-anchor="middle" font-family="var(--mono)" fill="#2D7DD2">🔑 clé BLEUE</text>
+          <text x="170" y="240" font-size="16" text-anchor="middle" fill="var(--red)">✗</text>
+        </g>
+        <g>
+          <rect x="224" y="188" width="96" height="58" rx="10" fill="var(--panel2)" stroke="#E08A2B" stroke-width="2"/>
+          <text x="272" y="207" font-size="9" text-anchor="middle" font-family="var(--sans)" font-weight="700" fill="var(--ink)">RDSH-C</text>
+          <text x="272" y="221" font-size="8" text-anchor="middle" font-family="var(--mono)" fill="#E08A2B">🔑 clé AMBRE</text>
+          <text x="272" y="240" font-size="16" text-anchor="middle" fill="var(--red)">✗</text>
+        </g>
+      </svg>
+      <div class="verdict">Kerberos : 0/3 ✗ → NTLM</div>
+    </div>
+  </div>
+
+  <div class="note-box">
+    <b>La différence critique :</b> dans IIS, l'identité du pool d'applications est un réglage de première classe (modifiable, supporté) → le processus <b>accepte</b> les AP-REQ avec la clé du compte de service. Dans RDP, l'authentification NLA/CredSSP est ancrée à l'<b>identité machine</b> (NetworkService + clés privées RSA machine) → le backend tente de déchiffrer l'AP-REQ avec sa <b>clé machine</b>, pas celle du gMSA, quel que soit le compte du service.
+  </div>
+</section>
+
+<!-- ============ POURQUOI RDP ÉCHOUE ============ -->
+<section>
+  <div class="subh">Pourquoi TermService ne peut pas utiliser un gMSA</div>
+  <div class="cards c3">
+    <div class="card fail">
+      <div class="cn">Architecture NLA</div>
+      <h3>L'authentification RDP est dans le contexte machine</h3>
+      <p>Le listener RDP-Tcp accepte les connexions et traite NLA/CredSSP dans le <b>contexte de la machine</b> (NetworkService → LSASS → clé du compte ordinateur). L'<code>AP-REQ</code> est déchiffré avec la clé machine, pas celle du service configuré dans la console Services.</p>
+    </div>
+    <div class="card fail">
+      <div class="cn">Dépendances machine</div>
+      <h3>TermService dépend des clés privées RSA de la machine</h3>
+      <p>Le certificat TLS du listener, les <code>MachineKeys</code> dans <code>Crypto\RSA</code>, les privilèges de création de session — tout est lié à NetworkService et à l'identité machine. Changer le compte du service casse cet accès.</p>
+    </div>
+    <div class="card fail">
+      <div class="cn">Non supporté</div>
+      <h3>Microsoft ne propose pas ce réglage</h3>
+      <p>Contrairement à IIS (AppPool identity) ou SQL Server (service account), il n'existe <b>aucun réglage supporté</b> pour dire à TermService d'accepter un ticket avec une autre clé que celle de la machine. La réponse Microsoft pour les fermes RDS est le <b>RD Connection Broker</b>.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SCHEMA 5 BACKENDS ============ -->
+<section>
+  <div class="subh">Ce qui se passe avec vos 5 backends</div>
+  <p class="lead">
+    Même si le gMSA est installé, même si le SPN est en place — le ticket est scellé avec la clé de <code>svc-vip$</code> (sarcelle), et chaque backend tente de l'ouvrir avec sa <b>propre clé machine</b>. Aucune ne correspond.
+  </p>
+  <div class="schema-wrap">
+    <svg viewBox="0 0 960 380" aria-label="Schéma 5 backends : ticket sarcelle, 0 match">
+      <defs>
+        <marker id="ar" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6" style="fill:none;stroke:var(--line3);stroke-width:1.3"/>
+        </marker>
+      </defs>
+      <!-- KDC -->
+      <rect class="box" x="360" y="10" width="240" height="50" rx="12"/>
+      <text class="nm" x="480" y="32" font-size="13" text-anchor="middle">KDC · Active Directory</text>
+      <text class="role" x="480" y="50" font-size="9" text-anchor="middle">scelle avec la clé de svc-vip$ (sarcelle)</text>
+      <path d="M480,60 V78" stroke="var(--line3)" stroke-width="1.4" marker-end="url(#ar)"/>
+      <!-- Ticket -->
+      <rect x="394" y="80" width="172" height="44" rx="10" fill="var(--panel2)" stroke="var(--teal)" stroke-width="2.5"/>
+      <text x="480" y="100" font-size="11" text-anchor="middle" font-family="var(--mono)" fill="var(--teal)" font-weight="600">🔒 Ticket — cadenas SARCELLE</text>
+      <text x="480" y="116" font-size="8.5" text-anchor="middle" font-family="var(--mono)" fill="var(--ink3)">(clé du gMSA svc-vip$)</text>
+      <path d="M480,124 V142" stroke="var(--line3)" stroke-width="1.4" marker-end="url(#ar)"/>
+      <!-- F5 -->
+      <rect class="box" x="400" y="144" width="160" height="38" rx="10"/>
+      <text class="nm" x="480" y="163" font-size="11.5" text-anchor="middle">F5 — VIP (L4)</text>
+      <text class="role" x="480" y="176" font-size="8.5" text-anchor="middle">distribue vers 1 des 5</text>
+      <!-- Fan-out -->
+      <path d="M480,182 V206" stroke="var(--line3)" stroke-width="1.2" marker-end="url(#ar)"/>
+      <path d="M480,182 C330,200 112,196 112,206" stroke="var(--line3)" stroke-width="1.2" marker-end="url(#ar)"/>
+      <path d="M480,182 C410,198 296,196 296,206" stroke="var(--line3)" stroke-width="1.2" marker-end="url(#ar)"/>
+      <path d="M480,182 C550,198 664,196 664,206" stroke="var(--line3)" stroke-width="1.2" marker-end="url(#ar)"/>
+      <path d="M480,182 C630,200 848,196 848,206" stroke="var(--line3)" stroke-width="1.2" marker-end="url(#ar)"/>
+      <!-- 5 backend cards -->
+      <g>
+        <rect x="26" y="210" width="172" height="148" rx="14" fill="var(--panel2)" stroke="#1FA45A" stroke-width="2"/>
+        <text x="112" y="236" font-size="12.5" text-anchor="middle" font-family="var(--sans)" font-weight="700" fill="var(--ink)">MachineDest-A</text>
+        <text x="112" y="254" font-size="9.5" text-anchor="middle" font-family="var(--mono)" fill="#1FA45A">clé machine VERTE</text>
+        <text x="80" y="298" font-size="10" text-anchor="middle" font-family="var(--mono)" fill="#1FA45A">🔑</text>
+        <text x="112" y="299" font-size="13" text-anchor="middle" font-family="var(--mono)" font-weight="700" fill="var(--ink3)">≠</text>
+        <text x="144" y="298" font-size="10" text-anchor="middle" font-family="var(--mono)" fill="var(--teal)">🔒</text>
+        <text x="112" y="330" font-size="18" text-anchor="middle" font-weight="800" fill="var(--red)">✗</text>
+        <text x="112" y="348" font-size="9" text-anchor="middle" font-family="var(--mono)" fill="var(--red)">AP_ERR_MODIFIED</text>
+      </g>
+      <g>
+        <rect x="210" y="210" width="172" height="148" rx="14" fill="var(--panel2)" stroke="#2D7DD2" stroke-width="2"/>
+        <text x="296" y="236" font-size="12.5" text-anchor="middle" font-family="var(--sans)" font-weight="700" fill="var(--ink)">MachineDest-B</text>
+        <text x="296" y="254" font-size="9.5" text-anchor="middle" font-family="var(--mono)" fill="#2D7DD2">clé machine BLEUE</text>
+        <text x="264" y="298" font-size="10" text-anchor="middle" font-family="var(--mono)" fill="#2D7DD2">🔑</text>
+        <text x="296" y="299" font-size="13" text-anchor="middle" font-family="var(--mono)" font-weight="700" fill="var(--ink3)">≠</text>
+        <text x="328" y="298" font-size="10" text-anchor="middle" font-family="var(--mono)" fill="var(--teal)">🔒</text>
+        <text x="296" y="330" font-size="18" text-anchor="middle" font-weight="800" fill="var(--red)">✗</text>
+        <text x="296" y="348" font-size="9" text-anchor="middle" font-family="var(--mono)" fill="var(--red)">AP_ERR_MODIFIED</text>
+      </g>
+      <g>
+        <rect x="394" y="210" width="172" height="148" rx="14" fill="var(--panel2)" stroke="#E08A2B" stroke-width="2"/>
+        <text x="480" y="236" font-size="12.5" text-anchor="middle" font-family="var(--sans)" font-weight="700" fill="var(--ink)">MachineDest-C</text>
+        <text x="480" y="254" font-size="9.5" text-anchor="middle" font-family="var(--mono)" fill="#E08A2B">clé machine AMBRE</text>
+        <text x="448" y="298" font-size="10" text-anchor="middle" font-family="var(--mono)" fill="#E08A2B">🔑</text>
+        <text x="480" y="299" font-size="13" text-anchor="middle" font-family="var(--mono)" font-weight="700" fill="var(--ink3)">≠</text>
+        <text x="512" y="298" font-size="10" text-anchor="middle" font-family="var(--mono)" fill="var(--teal)">🔒</text>
+        <text x="480" y="330" font-size="18" text-anchor="middle" font-weight="800" fill="var(--red)">✗</text>
+        <text x="480" y="348" font-size="9" text-anchor="middle" font-family="var(--mono)" fill="var(--red)">AP_ERR_MODIFIED</text>
+      </g>
+      <g>
+        <rect x="578" y="210" width="172" height="148" rx="14" fill="var(--panel2)" stroke="#D64545" stroke-width="2"/>
+        <text x="664" y="236" font-size="12.5" text-anchor="middle" font-family="var(--sans)" font-weight="700" fill="var(--ink)">MachineDest-D</text>
+        <text x="664" y="254" font-size="9.5" text-anchor="middle" font-family="var(--mono)" fill="#D64545">clé machine ROUGE</text>
+        <text x="632" y="298" font-size="10" text-anchor="middle" font-family="var(--mono)" fill="#D64545">🔑</text>
+        <text x="664" y="299" font-size="13" text-anchor="middle" font-family="var(--mono)" font-weight="700" fill="var(--ink3)">≠</text>
+        <text x="696" y="298" font-size="10" text-anchor="middle" font-family="var(--mono)" fill="var(--teal)">🔒</text>
+        <text x="664" y="330" font-size="18" text-anchor="middle" font-weight="800" fill="var(--red)">✗</text>
+        <text x="664" y="348" font-size="9" text-anchor="middle" font-family="var(--mono)" fill="var(--red)">AP_ERR_MODIFIED</text>
+      </g>
+      <g>
+        <rect x="762" y="210" width="172" height="148" rx="14" fill="var(--panel2)" stroke="#7E57C2" stroke-width="2"/>
+        <text x="848" y="236" font-size="12.5" text-anchor="middle" font-family="var(--sans)" font-weight="700" fill="var(--ink)">MachineDest-E</text>
+        <text x="848" y="254" font-size="9.5" text-anchor="middle" font-family="var(--mono)" fill="#7E57C2">clé machine VIOLETTE</text>
+        <text x="816" y="298" font-size="10" text-anchor="middle" font-family="var(--mono)" fill="#7E57C2">🔑</text>
+        <text x="848" y="299" font-size="13" text-anchor="middle" font-family="var(--mono)" font-weight="700" fill="var(--ink3)">≠</text>
+        <text x="880" y="298" font-size="10" text-anchor="middle" font-family="var(--mono)" fill="var(--teal)">🔒</text>
+        <text x="848" y="330" font-size="18" text-anchor="middle" font-weight="800" fill="var(--red)">✗</text>
+        <text x="848" y="348" font-size="9" text-anchor="middle" font-family="var(--mono)" fill="var(--red)">AP_ERR_MODIFIED</text>
+      </g>
+    </svg>
+    <div class="schema-foot">
+      Le KDC scelle le ticket avec la clé du compte <code>svc-vip$</code> (cadenas sarcelle). Chaque backend, en recevant l'<code>AP-REQ</code> dans le tunnel TLS, tente de l'ouvrir avec sa <b>propre clé machine</b> (verte, bleue, ambre, rouge, violette). Aucune ne correspond → <code>KRB_AP_ERR_MODIFIED</code> → repli NTLM sur les 5. Résultat : <b>0/5 en Kerberos</b>, exactement comme si vous n'aviez rien fait — le gMSA est installé mais n'est jamais sollicité par TermService.
+    </div>
+  </div>
+  <div class="keychips">
+    <span class="keychip" style="--kc:var(--teal)"><span class="dot"></span>sarcelle = gMSA svc-vip$ (la clé du cadenas)</span>
+    <span class="keychip" style="--kc:#1FA45A"><span class="dot"></span>A</span>
+    <span class="keychip" style="--kc:#2D7DD2"><span class="dot"></span>B</span>
+    <span class="keychip" style="--kc:#E08A2B"><span class="dot"></span>C</span>
+    <span class="keychip" style="--kc:#D64545"><span class="dot"></span>D</span>
+    <span class="keychip" style="--kc:#7E57C2"><span class="dot"></span>E</span>
+    <span style="font-family:var(--mono);font-size:11px;color:var(--ink3)">= clés machine des 5 backends</span>
+  </div>
+  <p class="hint">Règle : un cadenas a la couleur de la clé qui l'a fermé, et il ne s'ouvre qu'avec une clé de la <b>même</b> couleur. Le gMSA (sarcelle) n'est utilisé par aucun processus côté backend → sa clé reste dans AD, jamais chargée en mémoire.</p>
+</section>
+
+<!-- ============ NUANCE: FreeRDP ============ -->
+<section>
+  <div class="subh">Nuance — où ce modèle marcherait pour RDP</div>
+  <div class="note-box">
+    <b>FreeRDP (Linux).</b> Si le serveur RDP n'est pas le TermService Windows mais <b>FreeRDP</b> (proxy ou shadow server sous Linux), vous contrôlez le <b>keytab</b> et pouvez authentifier le service avec <code>TERMSRV/VIp-coop@ZRES.ZTECH</code> posé sur le compte de service — ça fonctionne en NLA + Kerberos. Mais ça implique de remplacer la pile RDP Windows par une stack que vous gérez vous-même, ce qui n'est généralement pas envisageable dans un environnement RDSH de production.
+  </div>
+</section>
+
+<!-- ============ ALTERNATIVES ============ -->
+<section>
+  <div class="subh">Les alternatives supportées pour du Kerberos en ferme RDP</div>
+  <div class="cards c3">
+    <div class="card ok">
+      <div class="cn">Option A</div>
+      <h3>RD Connection Broker</h3>
+      <p>Le broker redirige le client vers l'hôte de session <b>réel</b>. Kerberos vise alors <code>TERMSRV/&lt;vrai-hôte&gt;</code> sur le <b>compte machine</b> de cet hôte — qu'il possède forcément. C'est la réponse Microsoft supportée. Le client reçoit le nom de l'hôte cible et refait un nouveau TGS-REQ ciblé.</p>
+    </div>
+    <div class="card ok">
+      <div class="cn">Option B</div>
+      <h3>F5 APM + KCD (S4U2Proxy)</h3>
+      <p>Le F5 <b>termine</b> CredSSP, pré-authentifie l'utilisateur, puis obtient un ticket vers le <b>vrai SPN</b> de chaque backend au nom de l'utilisateur (Kerberos Constrained Delegation). Kerberos de bout en bout — au prix du L4 pur et du CredSSP natif.</p>
+    </div>
+    <div class="card alt">
+      <div class="cn">Option C</div>
+      <h3>Un seul backend</h3>
+      <p>Un seul RDSH derrière la VIP, avec <code>TERMSRV/VIp-coop</code> sur le compte machine de cet hôte unique : une seule clé → ça marche toujours. Mais zéro répartition de charge, zéro haute disponibilité.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<div class="footer">
+  <div class="quote">« Le bon réflexe, le mauvais service. »</div>
+  <div class="attrib">Le modèle compte-de-service + SPN partagé est exactement le bon — c'est juste que TermService est la seule brique courante où ce levier n'existe pas, contrairement à IIS. Pour du RDP en ferme, c'est RD Connection Broker ou APM + KCD.</div>
+</div>
+
+<script>
+/* ===== DATA ===== */
+const STEP_DATA=[
+  {ok:true, title:'Créer un groupe contenant les objets machines',
+   html:'<h4>✅ Étape 1 — Groupe AD</h4><p>Le groupe servira au paramètre <code>PrincipalsAllowedToRetrieveManagedPassword</code> du gMSA : il autorise les 5 backends à récupérer le mot de passe du compte de service. <b>Pas de problème</b> — c\'est la pratique standard pour tout gMSA.</p>'},
+  {ok:true, title:'Créer un compte de service dédié (gMSA)',
+   html:'<h4>✅ Étape 2 — Compte gMSA</h4><p>Création via <code>New-ADServiceAccount</code> avec rotation automatique du mot de passe. <b>Pas de problème</b> — c\'est un objet AD comme un autre, indépendant de l\'usage qu\'on veut en faire.</p>'},
+  {ok:true, title:'Ajouter le SPN de la VIP au compte',
+   html:'<h4>✅ Étape 3 — SPN sur le gMSA</h4><p><code>setspn -S TERMSRV/VIp-coop.zres.ztech svc-vip$</code> (et la forme courte). Le SPN est unique, posé sur un seul compte → le KDC sait quelle clé utiliser pour sceller le ticket. <b>Pas de problème</b> côté annuaire.</p>'},
+  {ok:true, title:'« Ouvrir une session en tant que service » via GPO',
+   html:'<h4>✅ Étape 4 — User Right Assignment</h4><p>Le droit <i>SeServiceLogonRight</i> est ajouté au gMSA sur chaque serveur (GPO ou secpol.msc). <b>Pas de problème</b> — c\'est un prérequis standard pour tout service qui tourne sous un compte de domaine.</p>'},
+  {ok:true, title:'Install-ADServiceAccount sur chaque serveur',
+   html:'<h4>✅ Étape 5 — Installation du gMSA</h4><p><code>Install-ADServiceAccount -Identity svc-vip$</code> puis <code>Test-ADServiceAccount</code> pour vérifier. Chaque machine peut désormais récupérer le mot de passe du gMSA. <b>Pas de problème</b> — le gMSA est prêt à l\'emploi sur les 5 serveurs.</p>'},
+  {ok:false, title:'Configurer TermService pour utiliser le gMSA',
+   html:'<h4>❌ Étape 6 — Configurer TermService → ÉCHEC</h4><p>C\'est ici que le plan s\'effondre. Contrairement à un AppPool IIS ou un service SQL, <b>TermService ne supporte pas un changement de compte d\'exécution</b>. Il est architecturalement lié à <code>NetworkService</code> et à l\'identité machine :</p><p style="margin-top:10px">• Le listener <code>RDP-Tcp</code> + NLA/CredSSP s\'authentifie avec la <b>clé machine</b> (<code>MACHINEDEST-X$</code>), pas avec le gMSA.</p><p>• Les <b>clés privées RSA</b> (certificat TLS du listener) sont dans les <code>MachineKeys</code>, accessibles à NetworkService — pas au gMSA.</p><p>• Même si vous forcez le compte du service dans <code>services.msc</code>, l\'<code>AP-REQ</code> continuera d\'être déchiffré avec la clé machine par la LSA. Résultat : <code>KRB_AP_ERR_MODIFIED</code> sur les 5 backends (<b>0/5</b>), et un TermService probablement cassé.</p><p style="margin-top:10px">Le gMSA est installé, son mot de passe est récupérable, le SPN est en place — mais <b>personne ne s\'en sert</b>. La clé sarcelle reste dans AD, jamais chargée en mémoire par le processus qui reçoit la connexion RDP.</p>'}
+];
+
+/* ===== STEP NAVIGATION ===== */
+const grid=document.getElementById('stepGrid');
+const detail=document.getElementById('stepDetail');
+const allSteps=grid.querySelectorAll('.step');
+
+function selectStep(i){
+  allSteps.forEach(s=>s.classList.remove('active'));
+  allSteps[i].classList.add('active');
+  const d=STEP_DATA[i];
+  detail.innerHTML=d.html;
+  detail.classList.toggle('is-fail',!d.ok);
+}
+allSteps.forEach((s,i)=>s.addEventListener('click',()=>selectStep(i)));
+selectStep(0);
+
+/* ===== THEME ===== */
+function toggleTheme(){
+  const h=document.documentElement;
+  const dark=h.getAttribute('data-theme')==='dark';
+  h.setAttribute('data-theme',dark?'light':'dark');
+  document.getElementById('themeBtn').textContent=dark?'🌙 Sombre':'☀️ Clair';
+}
+</script>
+</body>
+</html>
