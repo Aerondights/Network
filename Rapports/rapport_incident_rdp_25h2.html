@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>INC-RDP-25H2 — Échec des connexions RDP via VIP depuis Windows 11 25H2</title>
+<style>
+:root{
+  --encre:#101a22;        /* texte principal */
+  --papier:#f7f9fa;       /* fond page */
+  --carte:#ffffff;
+  --bleu:#1f6fb2;         /* bleu RDP — accent principal */
+  --bleu-fonce:#0e3a5c;
+  --ambre:#a86a00;        /* avertissement */
+  --rouge:#b3261e;        /* bloquant / critique */
+  --vert:#1e7a46;         /* validé / OK */
+  --gris:#5b6770;
+  --ligne:#d8dee3;
+  --code-fond:#0e1822;
+  --code-texte:#dce7ee;
+  --sans:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,Arial,sans-serif;
+  --mono:"Cascadia Mono","Cascadia Code",Consolas,ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--papier);color:var(--encre);font-family:var(--sans);font-size:15.5px;line-height:1.6}
+.bande{background:var(--encre);color:#eef3f6;padding:34px 24px 28px;border-bottom:4px solid var(--bleu)}
+.bande-int{max-width:980px;margin:0 auto}
+.bande .ref{font-family:var(--mono);font-size:12.5px;letter-spacing:.12em;color:#9fb6c5;text-transform:uppercase}
+.bande h1{margin:.35em 0 .2em;font-size:27px;font-weight:650;line-height:1.25;letter-spacing:-.01em}
+.bande .sous{color:#b9c8d2;font-size:15px;max-width:62ch}
+.meta{display:flex;flex-wrap:wrap;gap:10px 26px;margin-top:18px;font-size:13.5px}
+.meta div{color:#cfdae1}
+.meta b{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8da4b2;font-weight:600;margin-bottom:2px}
+.pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;letter-spacing:.04em;vertical-align:middle}
+.pill.p1{background:var(--rouge);color:#fff}
+.pill.encours{background:var(--ambre);color:#fff}
+main{max-width:980px;margin:0 auto;padding:34px 24px 70px}
+nav.sommaire{background:var(--carte);border:1px solid var(--ligne);border-radius:8px;padding:18px 22px;margin-bottom:36px}
+nav.sommaire b{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--gris)}
+nav.sommaire ol{margin:8px 0 0;padding-left:1.4em;columns:2;column-gap:40px;font-size:14.5px}
+nav.sommaire li{margin:3px 0;break-inside:avoid}
+nav.sommaire a{color:var(--bleu-fonce);text-decoration:none}
+nav.sommaire a:hover{text-decoration:underline}
+section{margin:44px 0}
+h2{font-size:21px;font-weight:650;letter-spacing:-.01em;margin:0 0 14px;padding-top:6px}
+h2 .num{font-family:var(--mono);color:var(--bleu);font-size:15px;margin-right:10px;font-weight:600}
+h3{font-size:16.5px;font-weight:650;margin:26px 0 8px}
+p{margin:.7em 0}
+.lede{font-size:16.5px}
+.encadre{border:1px solid var(--ligne);border-left:4px solid var(--bleu);background:var(--carte);border-radius:6px;padding:14px 18px;margin:18px 0}
+.encadre.attn{border-left-color:var(--ambre)}
+.encadre.crit{border-left-color:var(--rouge)}
+.encadre.ok{border-left-color:var(--vert)}
+.encadre b.titre{display:block;font-size:12px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;color:var(--gris)}
+.cause{background:var(--carte);border:1px solid var(--ligne);border-radius:8px;padding:18px 20px;margin:16px 0;border-left:5px solid var(--gris)}
+.cause.h1c{border-left-color:var(--rouge)}
+.cause.h2c{border-left-color:var(--ambre)}
+.cause.h3c{border-left-color:var(--bleu)}
+.cause.h4c{border-left-color:var(--gris)}
+.cause .entete{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.cause .entete h3{margin:0;font-size:16.5px}
+.prob{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 9px;border-radius:4px}
+.prob.tres-haute{background:#fae3e1;color:var(--rouge)}
+.prob.haute{background:#f7ecd9;color:var(--ambre)}
+.prob.moyenne{background:#e2eef7;color:var(--bleu-fonce)}
+.prob.basse{background:#e8ecef;color:var(--gris)}
+pre{background:var(--code-fond);color:var(--code-texte);font-family:var(--mono);font-size:13px;line-height:1.55;padding:14px 16px;border-radius:6px;overflow-x:auto;margin:12px 0}
+pre .c{color:#7fa3b8}
+code{font-family:var(--mono);font-size:.92em;background:#e8eef2;padding:1px 5px;border-radius:4px}
+pre code{background:none;padding:0}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px;background:var(--carte)}
+th{background:var(--encre);color:#eef3f6;text-align:left;padding:9px 12px;font-weight:600;font-size:12.5px;letter-spacing:.04em;text-transform:uppercase}
+td{padding:9px 12px;border:1px solid var(--ligne);vertical-align:top}
+tr:nth-child(even) td{background:#fbfcfd}
+ol.etapes{counter-reset:etape;list-style:none;padding-left:0;margin:14px 0}
+ol.etapes>li{counter-increment:etape;position:relative;padding:0 0 18px 52px;border-left:2px solid var(--ligne);margin-left:17px}
+ol.etapes>li:last-child{border-left-color:transparent}
+ol.etapes>li::before{content:counter(etape);position:absolute;left:-18px;top:-2px;width:34px;height:34px;border-radius:50%;background:var(--bleu);color:#fff;font-family:var(--mono);font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center}
+ol.etapes>li>b:first-child{display:block;font-size:15.5px;margin-bottom:4px}
+.go{display:inline-block;background:var(--vert);color:#fff;font-size:11px;font-weight:700;letter-spacing:.08em;padding:2px 8px;border-radius:4px;text-transform:uppercase}
+.nogo{display:inline-block;background:var(--rouge);color:#fff;font-size:11px;font-weight:700;letter-spacing:.08em;padding:2px 8px;border-radius:4px;text-transform:uppercase}
+figure{margin:22px 0;background:var(--carte);border:1px solid var(--ligne);border-radius:8px;padding:18px}
+figcaption{font-size:13px;color:var(--gris);margin-top:10px;text-align:center}
+footer{border-top:1px solid var(--ligne);margin-top:50px;padding-top:16px;font-size:13px;color:var(--gris)}
+a{color:var(--bleu-fonce)}
+ul{margin:.5em 0;padding-left:1.3em}
+li{margin:4px 0}
+@media (max-width:720px){nav.sommaire ol{columns:1}.bande h1{font-size:22px}}
+@media print{
+  body{background:#fff;font-size:12px}
+  .bande{background:#fff;color:#000;border-bottom:3px solid #000}
+  .bande .sous,.meta div,.meta b{color:#333}
+  pre{background:#f2f2f2;color:#000;border:1px solid #ccc;white-space:pre-wrap}
+  .cause,.encadre,figure{break-inside:avoid}
+  nav.sommaire{display:none}
+}
+</style>
+</head>
+<body>
+
+<header class="bande">
+  <div class="bande-int">
+    <div class="ref">Rapport d&rsquo;incident &amp; plan de remédiation &nbsp;·&nbsp; INC-RDP-25H2-001</div>
+    <h1>Échec des connexions RDP via la VIP (relais TCP) depuis les postes Windows&nbsp;11&nbsp;25H2</h1>
+    <p class="sous">Les utilisateurs équipés de postes Windows&nbsp;11&nbsp;25H2 ne peuvent plus joindre les machines virtuelles du pool en passant par la VIP. La connexion directe vers les VM fonctionne. Le présent rapport établit les causes probables, le protocole de qualification et le protocole de correction.</p>
+    <div class="meta">
+      <div><b>Sévérité</b><span class="pill p1">P1 — Production</span></div>
+      <div><b>Statut</b><span class="pill encours">Diagnostic / remédiation</span></div>
+      <div><b>Date du rapport</b>12 juin 2026</div>
+      <div><b>Périmètre</b>Postes clients Windows 11 25H2 → VIP (relais TCP) → pool de VM</div>
+      <div><b>Service impacté</b>Accès RDP aux postes de travail virtuels</div>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<nav class="sommaire">
+  <b>Sommaire</b>
+  <ol>
+    <li><a href="#synthese">Synthèse exécutive</a></li>
+    <li><a href="#contexte">Contexte, architecture et symptômes</a></li>
+    <li><a href="#durcissements">Ce qui a changé avec Windows 11 25H2</a></li>
+    <li><a href="#causes">Causes racines probables (classées)</a></li>
+    <li><a href="#diagnostic">Protocole de diagnostic (qualification)</a></li>
+    <li><a href="#immediat">Solutions de rétablissement immédiat</a></li>
+    <li><a href="#durable">Correctifs durables (cible)</a></li>
+    <li><a href="#runbook">Protocole d&rsquo;exécution détaillé (runbook)</a></li>
+    <li><a href="#erreurs">Référentiel erreurs &amp; événements</a></li>
+    <li><a href="#risques">Risques et points de vigilance</a></li>
+    <li><a href="#references">Références</a></li>
+  </ol>
+</nav>
+
+<section id="synthese">
+  <h2><span class="num">01</span>Synthèse exécutive</h2>
+  <p class="lede">Le scénario observé — <b>connexion directe vers la VM fonctionnelle, connexion via la VIP en échec</b> — est la signature classique d&rsquo;un problème d&rsquo;<b>authentification de niveau réseau (NLA)</b> et non d&rsquo;un problème réseau. Le relais TCP transporte correctement le flux ; c&rsquo;est la couche d&rsquo;authentification CredSSP (Kerberos/NTLM) qui échoue lorsque le nom utilisé par le client (celui de la VIP) ne correspond pas à l&rsquo;identité de la machine qui répond.</p>
+  <p>Jusqu&rsquo;à présent, ce décalage de nom était silencieusement absorbé par une <b>bascule automatique vers NTLM</b>. Windows&nbsp;11&nbsp;25H2 (et les mises à jour cumulatives associées depuis fin 2025) durcit précisément ce point : restriction de la bascule NTLM, application de l&rsquo;Extended Protection for Authentication (EPA) sur CredSSP, contrôle d&rsquo;unicité des SID machine et validation plus stricte de l&rsquo;identité du serveur. Résultat : ce qui reposait sur NTLM cesse de fonctionner, et seules les connexions où Kerberos peut aboutir (nom FQDN réel de la machine, SPN <code>TERMSRV/&lt;fqdn&gt;</code> existant) restent opérationnelles — exactement le comportement constaté.</p>
+  <div class="encadre ok">
+    <b class="titre">Recommandation en une phrase</b>
+    Rétablir le service à court terme par une <b>exception NTLM ciblée et auditée sur le seul nom de la VIP</b> (ou par le correctif Microsoft adapté si la qualification révèle une autre cause), puis supprimer structurellement la dépendance à NTLM en remplaçant le relais TCP par une <b>architecture supportée (broker RDS / RD Gateway)</b> ou, à défaut, en publiant des <b>certificats RDP d&rsquo;entreprise incluant le nom de la VIP</b> et en encadrant NTLMv2.
+  </div>
+  <div class="encadre attn">
+    <b class="titre">Limite de ce rapport</b>
+    Le code d&rsquo;erreur exact affiché côté client et les journaux n&rsquo;ont pas encore été communiqués. Quatre hypothèses sont donc qualifiées en section&nbsp;04, avec un protocole de diagnostic (section&nbsp;05) qui permet de désigner la cause en moins d&rsquo;une heure. <b>Ne pas appliquer de correctif avant la phase de qualification</b> : chaque option de la section&nbsp;06 est conditionnée au résultat des tests.
+  </div>
+</section>
+
+<section id="contexte">
+  <h2><span class="num">02</span>Contexte, architecture et symptômes</h2>
+  <p>Architecture concernée : les postes clients se connectent en RDP à une <b>VIP qui agit comme relais TCP (répartition de charge de niveau&nbsp;4, sans terminaison TLS)</b> vers un pool de machines virtuelles. Le flux TLS/CredSSP est donc négocié de bout en bout entre le poste client et la VM finale ; la VIP ne fait que transporter les paquets. Conséquence structurante : <b>le client croit parler à « vip.exemple.fr », mais c&rsquo;est « vm-prod-0xx.exemple.fr » qui répond</b>, avec son propre compte machine, son propre SPN et son propre certificat.</p>
+
+  <figure>
+    <svg viewBox="0 0 920 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Schéma comparant le chemin direct (fonctionnel) et le chemin via VIP (en échec)" style="width:100%;height:auto;font-family:var(--sans)">
+      <defs>
+        <marker id="fl" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#5b6770"/></marker>
+        <marker id="flv" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#1e7a46"/></marker>
+        <marker id="flr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#b3261e"/></marker>
+      </defs>
+      <text x="20" y="28" font-size="13" font-weight="700" fill="#1e7a46" letter-spacing=".08em">CHEMIN DIRECT — FONCTIONNEL</text>
+      <rect x="20" y="45" width="170" height="56" rx="7" fill="#fff" stroke="#101a22" stroke-width="1.3"/>
+      <text x="105" y="68" text-anchor="middle" font-size="13.5" font-weight="600" fill="#101a22">Poste client</text>
+      <text x="105" y="87" text-anchor="middle" font-size="12" fill="#5b6770">Windows 11 25H2</text>
+      <line x1="190" y1="73" x2="610" y2="73" stroke="#1e7a46" stroke-width="2" marker-end="url(#flv)"/>
+      <text x="400" y="60" text-anchor="middle" font-size="12.5" fill="#1e7a46" font-weight="600">mstsc /v:vm-prod-042.exemple.fr</text>
+      <text x="400" y="93" text-anchor="middle" font-size="12" fill="#1e7a46">Kerberos : ticket TERMSRV/vm-prod-042 ✓ — NLA réussit</text>
+      <rect x="620" y="45" width="160" height="56" rx="7" fill="#fff" stroke="#101a22" stroke-width="1.3"/>
+      <text x="700" y="68" text-anchor="middle" font-size="13.5" font-weight="600" fill="#101a22">VM-PROD-042</text>
+      <text x="700" y="87" text-anchor="middle" font-size="12" fill="#5b6770">Pool de VM</text>
+      <text x="845" y="78" text-anchor="middle" font-size="22" fill="#1e7a46" font-weight="700">OK</text>
+
+      <line x1="20" y1="130" x2="900" y2="130" stroke="#d8dee3" stroke-width="1"/>
+
+      <text x="20" y="160" font-size="13" font-weight="700" fill="#b3261e" letter-spacing=".08em">CHEMIN VIA VIP — EN ÉCHEC DEPUIS 25H2</text>
+      <rect x="20" y="180" width="170" height="56" rx="7" fill="#fff" stroke="#101a22" stroke-width="1.3"/>
+      <text x="105" y="203" text-anchor="middle" font-size="13.5" font-weight="600" fill="#101a22">Poste client</text>
+      <text x="105" y="222" text-anchor="middle" font-size="12" fill="#5b6770">Windows 11 25H2</text>
+      <line x1="190" y1="208" x2="370" y2="208" stroke="#5b6770" stroke-width="2" marker-end="url(#fl)"/>
+      <text x="280" y="196" text-anchor="middle" font-size="12.5" fill="#101a22">mstsc /v:vip.exemple.fr</text>
+      <rect x="380" y="180" width="150" height="56" rx="7" fill="#eef3f6" stroke="#1f6fb2" stroke-width="1.5"/>
+      <text x="455" y="203" text-anchor="middle" font-size="13.5" font-weight="600" fill="#0e3a5c">VIP — relais TCP</text>
+      <text x="455" y="222" text-anchor="middle" font-size="12" fill="#5b6770">L4, sans rupture TLS</text>
+      <line x1="530" y1="208" x2="610" y2="208" stroke="#b3261e" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#flr)"/>
+      <rect x="620" y="180" width="160" height="56" rx="7" fill="#fff" stroke="#101a22" stroke-width="1.3"/>
+      <text x="700" y="203" text-anchor="middle" font-size="13.5" font-weight="600" fill="#101a22">VM-PROD-0xx</text>
+      <text x="700" y="222" text-anchor="middle" font-size="12" fill="#5b6770">tirée du pool</text>
+      <text x="845" y="213" text-anchor="middle" font-size="22" fill="#b3261e" font-weight="700">✕</text>
+      <text x="450" y="268" text-anchor="middle" font-size="12.5" fill="#b3261e" font-weight="600">1. Kerberos cherche TERMSRV/vip.exemple.fr → SPN introuvable (un SPN ne peut appartenir qu&rsquo;à un seul compte machine)</text>
+      <text x="450" y="290" text-anchor="middle" font-size="12.5" fill="#b3261e" font-weight="600">2. Bascule NTLM → désormais restreinte / bloquée par le durcissement 25H2 (NTLM, EPA, SID) → échec NLA</text>
+      <text x="450" y="312" text-anchor="middle" font-size="12" fill="#5b6770">Avant 25H2 : la même bascule NTLM réussissait silencieusement — d&rsquo;où l&rsquo;impression que « la VIP ne marche plus »</text>
+    </svg>
+    <figcaption>Figure 1 — Point de rupture : la VIP transporte le flux, mais l&rsquo;identité Kerberos/certificat présentée par la VM ne correspond pas au nom « VIP » utilisé par le client.</figcaption>
+  </figure>
+
+  <h3>Symptômes consolidés</h3>
+  <table>
+    <tr><th>Observation</th><th>Lecture technique</th></tr>
+    <tr><td>Connexion RDP directe vers une VM du pool : <b>OK</b></td><td>Réseau, service TermService, licence et droits utilisateurs sont sains. Kerberos aboutit car le SPN <code>TERMSRV/&lt;fqdn-vm&gt;</code> existe.</td></tr>
+    <tr><td>Connexion via la VIP : <b>échec</b> depuis les postes 25H2</td><td>Rupture au niveau NLA/CredSSP ou validation d&rsquo;identité serveur — pas au niveau transport (le relais TCP est inchangé).</td></tr>
+    <tr><td>Apparition corrélée au durcissement RDP / passage 25H2</td><td>Régression de compatibilité attendue : les mécanismes de secours non sécurisés (NTLM, certificats non conformes, identités machine dupliquées) sont désormais refusés au lieu d&rsquo;être tolérés.</td></tr>
+  </table>
+  <div class="encadre">
+    <b class="titre">Précision de périmètre à confirmer</b>
+    Le terme « durcissement du protocole RDP sur 25H2 » peut recouvrir deux réalités : (a)&nbsp;les durcissements <b>natifs</b> livrés par Microsoft avec 25H2 et ses mises à jour cumulatives, et/ou (b)&nbsp;une <b>GPO de durcissement interne</b> déployée par vos équipes sur le socle 25H2. Le mécanisme de rupture est identique dans les deux cas, mais si une GPO interne est en cause, la correction peut se limiter à ajuster un paramètre précis de cette GPO (voir étape&nbsp;1 du diagnostic, <code>gpresult</code>).
+  </div>
+</section>
+
+<section id="durcissements">
+  <h2><span class="num">03</span>Ce qui a changé avec Windows&nbsp;11&nbsp;25H2 (et ses mises à jour)</h2>
+  <p>Quatre familles de durcissement introduites ou renforcées sur la branche 24H2/25H2 sont susceptibles de casser une connexion RDP relayée par une VIP. Elles peuvent se cumuler.</p>
+  <table>
+    <tr><th style="width:24%">Durcissement</th><th>Mécanisme</th><th style="width:30%">Impact sur le scénario « VIP »</th></tr>
+    <tr>
+      <td><b>Restriction / dépréciation NTLM</b></td>
+      <td>Microsoft déprécie progressivement NTLM depuis 24H2 ; les mises à jour récentes bloquent la bascule NTLM dans davantage de scénarios et renforcent l&rsquo;audit. Message type côté client : « <i>Une erreur d&rsquo;authentification s&rsquo;est produite. La fonction demandée n&rsquo;est pas prise en charge&hellip; cela peut être dû au blocage de l&rsquo;authentification NTLM</i> ».</td>
+      <td><b>Critique.</b> La connexion via VIP repose historiquement sur la bascule NTLM (pas de SPN pour le nom VIP). Si NTLM sortant est restreint sur le poste 25H2 (nativement ou par GPO), la NLA échoue uniquement via la VIP.</td>
+    </tr>
+    <tr>
+      <td><b>EPA / liaison de service (CVE anti-relais)</b></td>
+      <td>Les cumulatives depuis sept. 2025 (ex.&nbsp;KB5065426) appliquent l&rsquo;Extended Protection for Authentication : l&rsquo;authentification est liée au canal TLS et au nom de service visé.</td>
+      <td>Une authentification NTLM émise pour <code>TERMSRV/vip</code> peut être rejetée par une VM dont l&rsquo;identité réelle est différente — comportement volontaire (anti-relais), qui pénalise les relais légitimes.</td>
+    </tr>
+    <tr>
+      <td><b>Unicité des SID machine</b></td>
+      <td>Depuis KB5064081 (préversion 29/08/2025) puis KB5065426 (09/09/2025), Kerberos et NTLM échouent entre machines partageant un SID dupliqué (images clonées sans Sysprep). Signature : événement LsaSrv <b>6167</b> « partial mismatch in the machine ID », erreurs <code>SEC_E_NO_CREDENTIALS</code>.</td>
+      <td><b>Élevé si le pool est cloné.</b> Les pools de VM provisionnés par clonage sans <code>sysprep /generalize</code> sont la cible typique de ce durcissement.</td>
+    </tr>
+    <tr>
+      <td><b>Transport RDP (UDP) &amp; avertissements</b></td>
+      <td>La branche 25H2 a connu une régression du transport UDP (KB5079473), corrigée par KB5085516 (21/03/2026). Par ailleurs, les mises à jour d&rsquo;avril 2026 (KB5083769) ajoutent des avertissements de sécurité sur les fichiers .rdp.</td>
+      <td>Moyen : une VIP qui ne relaie que TCP peut exposer des comportements de bascule UDP→TCP dégradés sur builds non corrigés (sessions qui se figent ou échouent après la phase d&rsquo;authentification).</td>
+    </tr>
+  </table>
+  <p>Point structurant à retenir pour la suite : <b>un SPN Kerberos ne peut être enregistré que sur un seul compte</b>. Il est donc <b>impossible</b> de déclarer <code>TERMSRV/vip.exemple.fr</code> sur chacune des VM du pool — c&rsquo;est précisément pourquoi un pool derrière un nom unique ne peut pas fonctionner en Kerberos pur sans broker, et pourquoi il dépendait de NTLM sans que cela ait été nécessairement identifié.</p>
+</section>
+
+<section id="causes">
+  <h2><span class="num">04</span>Causes racines probables (classées)</h2>
+
+  <div class="cause h1c">
+    <div class="entete"><h3>H1 — Bascule NTLM bloquée alors que Kerberos est impossible via le nom de la VIP</h3><span class="prob tres-haute">Probabilité très haute</span></div>
+    <p><b>Mécanisme.</b> La NLA (CredSSP) tente d&rsquo;abord Kerberos avec le SPN <code>TERMSRV/vip.exemple.fr</code>. Ce SPN n&rsquo;existe pas (et ne peut pas exister sur chaque VM du pool, un SPN étant unique à un seul compte). Kerberos échoue donc systématiquement via la VIP et le client bascule sur NTLM. Le durcissement 25H2 — ou une GPO interne « Restreindre NTLM : trafic sortant » — refuse désormais cette bascule : la NLA échoue, la connexion est rejetée avant même l&rsquo;écran d&rsquo;ouverture de session.</p>
+    <p><b>Pourquoi cela colle aux symptômes.</b> En direct, le SPN <code>TERMSRV/&lt;fqdn-vm&gt;</code> existe → Kerberos réussit → aucun besoin de NTLM → connexion OK. Via la VIP, seul NTLM pouvait aboutir → bloqué → échec. C&rsquo;est la seule hypothèse qui explique à elle seule le contraste « direct OK / VIP KO » sur 100&nbsp;% des postes 25H2.</p>
+    <p><b>Signature attendue.</b> Message « <i>La fonction demandée n&rsquo;est pas prise en charge&hellip; blocage de l&rsquo;authentification NTLM / CredSSP</i> », ticket Kerberos en échec <code>KDC_ERR_S_PRINCIPAL_UNKNOWN</code>, événements NTLM 8001/8004 côté client.</p>
+  </div>
+
+  <div class="cause h2c">
+    <div class="entete"><h3>H2 — SID machine dupliqués dans le pool de VM (clones sans Sysprep)</h3><span class="prob haute">Probabilité haute si pool cloné</span></div>
+    <p><b>Mécanisme.</b> Depuis KB5064081/KB5065426 (août–sept. 2025), Windows bloque les authentifications Kerberos <i>et</i> NTLM entre machines partageant un SID dupliqué — cas typique des pools de VM provisionnés par clonage d&rsquo;une image de référence sans <code>sysprep /generalize</code>. La connexion peut alors échouer même quand l&rsquo;authentification semble correcte.</p>
+    <p><b>Nuance.</b> Le fait que la connexion <i>directe</i> fonctionne plaide contre cette hypothèse comme cause unique ; elle peut toutefois se cumuler avec H1 (le blocage SID s&rsquo;exprime différemment selon le protocole tenté). À vérifier en 5 minutes si le pool est issu de clones.</p>
+    <p><b>Signature attendue.</b> Événement <b>LsaSrv 6167</b> « <i>partial mismatch in the machine ID</i> » côté VM, erreurs <code>SEC_E_NO_CREDENTIALS</code>, échecs « Vos informations d&rsquo;identification n&rsquo;ont pas fonctionné ».</p>
+  </div>
+
+  <div class="cause h3c">
+    <div class="entete"><h3>H3 — Validation renforcée de l&rsquo;identité du serveur (certificat ≠ nom VIP)</h3><span class="prob moyenne">Probabilité moyenne</span></div>
+    <p><b>Mécanisme.</b> Chaque VM présente son certificat RDP auto-généré au nom de la machine. Le client, lui, a demandé « vip.exemple.fr » : non-concordance de nom + certificat non approuvé. Historiquement, cela produisait un simple avertissement contournable ; un durcissement (natif ou GPO « Configurer l&rsquo;authentification du serveur pour le client » = « Ne pas se connecter ») transforme l&rsquo;avertissement en refus.</p>
+    <p><b>Signature attendue.</b> Erreur explicite de certificat / « l&rsquo;identité de l&rsquo;ordinateur distant ne peut pas être vérifiée », sans mention de NTLM. L&rsquo;échec survient après la phase NLA si celle-ci aboutit.</p>
+  </div>
+
+  <div class="cause h4c">
+    <div class="entete"><h3>H4 — Transport UDP / régression de build</h3><span class="prob basse">Probabilité basse</span></div>
+    <p><b>Mécanisme.</b> La VIP ne relaie que TCP ; le client tente UDP en complément. Sur les builds 25H2 affectés par la régression KB5079473 (corrigée par KB5085516 du 21/03/2026), la bascule UDP→TCP se dégrade : sessions qui se figent, écrans noirs, déconnexions immédiates.</p>
+    <p><b>Nuance.</b> Cette cause produit plutôt des sessions instables <i>après</i> authentification qu&rsquo;un refus de connexion net. À éliminer en vérifiant le niveau de patch et en forçant TCP.</p>
+  </div>
+</section>
+
+<section id="diagnostic">
+  <h2><span class="num">05</span>Protocole de diagnostic (qualification — objectif : désigner la cause en &lt; 1 h)</h2>
+  <p>À dérouler dans l&rsquo;ordre sur <b>un poste 25H2 impacté</b> et <b>une VM du pool</b>. Remplacer <code>vip.exemple.fr</code> et <code>vm-prod-042.exemple.fr</code> par vos noms réels. Toutes les commandes sont en lecture seule sauf mention contraire.</p>
+
+  <ol class="etapes">
+    <li>
+      <b>Photographier les stratégies effectives (et identifier le « durcissement » exact)</b>
+      <p>Sur le poste client, en console élevée :</p>
+<pre><code>gpresult /h C:\Temp\rsop_poste.html /f
+reg query "HKLM\SYSTEM\CurrentControlSet\Control\Lsa\MSV1_0" /v RestrictSendingNTLMTraffic
+<span class="c"># 0 ou valeur absente = NTLM sortant autorisé · 1 = audit · 2 = refus</span>
+reg query "HKLM\SYSTEM\CurrentControlSet\Control\Lsa\MSV1_0" /v ClientAllowedNTLMServers</code></pre>
+      <p>Dans le rapport RSOP, rechercher : « Restreindre NTLM », « Configurer l&rsquo;authentification du serveur pour le client », « Désactiver UDP sur le client », et toute GPO de durcissement RDP interne. Si une GPO interne fixe « trafic NTLM sortant = Refuser tout », <b>H1 est quasi confirmée</b> avant même les tests suivants.</p>
+    </li>
+    <li>
+      <b>Reproduire et capturer le message d&rsquo;erreur exact</b>
+      <p>Lancer <code>mstsc /v:vip.exemple.fr</code> et photographier l&rsquo;erreur (texte + « Code d&rsquo;erreur / Code d&rsquo;erreur étendu »). Le libellé oriente immédiatement : mention NTLM/CredSSP → H1 ; mention certificat/identité → H3 ; « informations d&rsquo;identification » → H1/H2 ; connexion établie puis figée → H4.</p>
+    </li>
+    <li>
+      <b>Matrice de connexions comparées</b>
+<pre><code>mstsc /v:vm-prod-042.exemple.fr     <span class="c"># attendu : OK (référence)</span>
+mstsc /v:vip.exemple.fr             <span class="c"># attendu : échec (cas incident)</span>
+mstsc /v:&lt;IP-de-la-VIP&gt;             <span class="c"># IP = NTLM forcé : si échec identique → cohérent H1</span>
+<span class="c"># Depuis un poste 23H2/24H2 non durci, refaire mstsc /v:vip.exemple.fr :</span>
+<span class="c">#   OK → la régression est bien portée par le durcissement côté client 25H2</span></code></pre>
+    </li>
+    <li>
+      <b>Vérifier Kerberos et le SPN du nom VIP</b>
+<pre><code>klist purge
+klist get TERMSRV/vip.exemple.fr
+<span class="c"># Attendu si H1 : échec KDC_ERR_S_PRINCIPAL_UNKNOWN (0x7)</span>
+klist get TERMSRV/vm-prod-042.exemple.fr
+<span class="c"># Attendu : ticket délivré (preuve que Kerberos fonctionne sur le nom réel)</span>
+
+setspn -Q TERMSRV/vip.exemple.fr
+<span class="c"># Attendu si H1 : "No such SPN found" — et rappel : impossible de l'ajouter sur N machines</span></code></pre>
+    </li>
+    <li>
+      <b>Lire les journaux NTLM et RDP côté client</b>
+      <p>Observateur d&rsquo;événements → Journaux des applications et services → Microsoft → Windows :</p>
+      <ul>
+        <li><code>NTLM/Operational</code> : événements 8001–8004 (audit ou blocage NTLM sortant/entrant). Un 8004/8001 mentionnant <code>vip.exemple.fr</code> au moment du test = <b>confirmation H1</b>.</li>
+        <li><code>TerminalServices-RDPClient/Operational</code> : événement 1026 (code de déconnexion), 1105.</li>
+      </ul>
+    </li>
+    <li>
+      <b>Côté VM du pool : journaux serveur et unicité des SID</b>
+<pre><code><span class="c"># Journal Sécurité : événements 4625 — noter le « Package d'authentification » (NTLM vs Kerberos)</span>
+<span class="c"># Journal Système : LsaSrv 6167 « partial mismatch in the machine ID » → H2 confirmée</span>
+
+<span class="c"># Unicité des SID machine (Sysinternals), à comparer sur 2-3 VM du pool :</span>
+psgetsid \\vm-prod-041
+psgetsid \\vm-prod-042
+<span class="c"># SID identiques → pool cloné sans Sysprep → H2</span></code></pre>
+    </li>
+    <li>
+      <b>Éliminer le transport (H4)</b>
+<pre><code>winver   <span class="c"># sur le poste : vérifier que la cumulative ≥ KB5085516 (mars 2026) est installée</span>
+<span class="c"># Test en forçant TCP côté client (GPO « Désactiver UDP sur le client ») :</span>
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v fClientDisableUDP /t REG_DWORD /d 1 /f
+<span class="c"># (test ponctuel ; à retirer ou à porter en GPO si concluant)</span></code></pre>
+    </li>
+    <li>
+      <b>Test discriminant final (à n&rsquo;utiliser que pour le diagnostic)</b>
+      <p>Copier un fichier .rdp de test, y ajouter <code>enablecredsspsupport:i:0</code> (désactive la NLA côté client, uniquement si le serveur l&rsquo;autorise) et retenter via la VIP. Si la connexion passe alors jusqu&rsquo;à l&rsquo;écran d&rsquo;ouverture de session, la rupture est bien dans la couche NLA/CredSSP (H1/H2) et non dans le transport. <b>Ne jamais déployer ce contournement en production.</b></p>
+    </li>
+  </ol>
+
+  <h3>Tableau de décision</h3>
+  <table>
+    <tr><th>Constat de qualification</th><th>Cause désignée</th><th>Option de rétablissement (section 06)</th></tr>
+    <tr><td><code>klist get TERMSRV/vip</code> → <code>KDC_ERR_S_PRINCIPAL_UNKNOWN</code> <b>et</b> NTLM 8001/8004 au moment du test ; RSOP montre « NTLM sortant : refuser/auditer »</td><td><b>H1</b> — bascule NTLM bloquée</td><td><b>Option A</b> — exception NTLM ciblée sur la VIP</td></tr>
+    <tr><td>LsaSrv <b>6167</b> sur les VM et/ou SID identiques entre VM du pool</td><td><b>H2</b> — SID dupliqués</td><td><b>Option B</b> — mitigation Microsoft + re-masterisation Sysprep</td></tr>
+    <tr><td>Erreur de certificat / identité serveur, sans mention NTLM ; RSOP « authentification du serveur : ne pas se connecter »</td><td><b>H3</b> — identité serveur</td><td><b>Option C</b> — politique « Avertir » + certificats SAN (cible)</td></tr>
+    <tr><td>Connexion établie puis figée/écran noir ; build sans KB5085516 ; OK en forçant TCP</td><td><b>H4</b> — transport UDP</td><td><b>Option D</b> — patch + TCP only</td></tr>
+  </table>
+</section>
+
+<section id="immediat">
+  <h2><span class="num">06</span>Solutions de rétablissement immédiat (conditionnées au diagnostic)</h2>
+  <p>Chaque option ci-dessous rétablit le service en limitant la régression de sécurité au strict nécessaire. Appliquer <b>uniquement</b> l&rsquo;option désignée par le tableau de décision, d&rsquo;abord sur une OU pilote (5–10 postes), puis généraliser.</p>
+
+  <div class="cause h1c">
+    <div class="entete"><h3>Option A — Exception NTLM ciblée et auditée sur le nom de la VIP <span class="prob tres-haute">si H1</span></h3></div>
+    <p><b>Principe.</b> On ne réautorise pas NTLM globalement : on déclare le nom de la VIP comme exception au blocage du trafic NTLM sortant, et on passe la politique générale en mode « Auditer » le temps de la transition. L&rsquo;exposition reste cantonnée à un flux connu, journalisé et daté.</p>
+    <p><b>GPO (à appliquer sur l&rsquo;OU des postes clients 25H2)</b> — Configuration ordinateur → Paramètres Windows → Paramètres de sécurité → Stratégies locales → Options de sécurité :</p>
+    <ul>
+      <li>« <b>Sécurité réseau : Restreindre NTLM : trafic NTLM sortant vers des serveurs distants</b> » → <i>Auditer tout</i> (si la valeur actuelle est <i>Refuser tout</i>) ;</li>
+      <li>« <b>Sécurité réseau : Restreindre NTLM : ajouter des exceptions de serveurs distants pour l&rsquo;authentification NTLM</b> » → ajouter <code>vip.exemple.fr</code> et le nom court <code>vip</code>.</li>
+    </ul>
+    <p><b>Équivalent registre</b> (pour test pilote immédiat avant portage GPO) :</p>
+<pre><code><span class="c"># Lire l'état actuel</span>
+reg query "HKLM\SYSTEM\CurrentControlSet\Control\Lsa\MSV1_0" /v RestrictSendingNTLMTraffic
+
+<span class="c"># Exception ciblée : seul le nom de la VIP est autorisé à recevoir du NTLM sortant</span>
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa\MSV1_0" /v ClientAllowedNTLMServers /t REG_MULTI_SZ /d "vip.exemple.fr\0vip" /f
+
+<span class="c"># Si la politique est à 2 (refus), la passer en 1 (audit) pendant la transition</span>
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa\MSV1_0" /v RestrictSendingNTLMTraffic /t REG_DWORD /d 1 /f
+
+gpupdate /force
+<span class="c"># Test : mstsc /v:vip.exemple.fr — puis vérifier l'événement NTLM 8001 (audit) au lieu du blocage</span></code></pre>
+    <p><b>Côté VM du pool</b> : vérifier qu&rsquo;aucune politique « Restreindre NTLM : trafic NTLM entrant » à <i>Refuser</i> n&rsquo;est appliquée (<code>RestrictReceivingNTLMTraffic</code> dans la même clé) ; sinon, ajouter l&rsquo;exception symétrique côté serveurs.</p>
+    <p><b>Délai de rétablissement estimé</b> : &lt; 30 min en pilote, 2–4 h en généralisation GPO. <b>Réversibilité</b> : suppression des deux valeurs / retour de la GPO à l&rsquo;état antérieur.</p>
+    <div class="encadre attn"><b class="titre">Garde-fous obligatoires</b>L&rsquo;exception doit viser <b>exclusivement</b> le nom de la VIP (jamais «&nbsp;*&nbsp;»), être tracée comme dette de sécurité avec une <b>date de retrait cible</b>, et s&rsquo;accompagner de la supervision des événements NTLM 8001–8004. NTLM via relais est précisément le schéma que l&rsquo;EPA cherche à éliminer : l&rsquo;option A est un sursis, pas une cible (voir section 07).</div>
+  </div>
+
+  <div class="cause h2c">
+    <div class="entete"><h3>Option B — Mitigation Microsoft « SID dupliqués » + re-masterisation <span class="prob haute">si H2</span></h3></div>
+    <p><b>Principe.</b> Le contrôle d&rsquo;unicité des SID n&rsquo;est pas désactivable par une GPO standard : Microsoft fournit un <b>package de stratégie temporaire via un cas de support Business</b> (référencer la page « Resolved issues Windows 11 25H2 » et l&rsquo;événement LsaSrv 6167 dans le ticket). En parallèle, vérifier que les cumulatives postérieures au 28/10/2025 sont déployées, certaines affinant ce comportement.</p>
+    <ul>
+      <li><b>Immédiat</b> : ouverture du cas Microsoft + bascule des utilisateurs en accès direct FQDN (mode dégradé documenté) le temps d&rsquo;obtenir le package.</li>
+      <li><b>Court terme</b> : re-générer l&rsquo;image de référence avec <code>sysprep /generalize /oobe /shutdown</code> et re-provisionner le pool — seule correction supportée à terme.</li>
+    </ul>
+    <p><b>Réversibilité</b> : sans objet (le package Microsoft est lui-même temporaire et borné).</p>
+  </div>
+
+  <div class="cause h3c">
+    <div class="entete"><h3>Option C — Revenir de « Refuser » à « Avertir » sur l&rsquo;authentification du serveur <span class="prob moyenne">si H3</span></h3></div>
+    <p><b>GPO client</b> : Configuration ordinateur → Modèles d&rsquo;administration → Composants Windows → Services Bureau à distance → Client Connexion Bureau à distance → « <b>Configurer l&rsquo;authentification du serveur pour le client</b> » → <i>Avertir en cas d&rsquo;échec de l&rsquo;authentification</i> (équivalent .rdp : <code>authentication level:i:2</code>).</p>
+    <p>Ce réglage rétablit le comportement historique (avertissement contournable) sans désactiver la vérification. La <b>correction propre</b> — certificats d&rsquo;entreprise portant le nom de la VIP — est décrite en section 07 et doit suivre rapidement pour faire disparaître l&rsquo;avertissement.</p>
+  </div>
+
+  <div class="cause h4c">
+    <div class="entete"><h3>Option D — Mise à niveau du build + transport TCP uniquement <span class="prob basse">si H4</span></h3></div>
+<pre><code><span class="c"># 1. Déployer la cumulative incluant le correctif transport (≥ KB5085516, 21/03/2026) sur les postes 25H2</span>
+
+<span class="c"># 2. Côté clients (GPO) : Désactiver UDP sur le client</span>
+<span class="c">#    Modèles d'administration → Composants Windows → Services Bureau à distance → Client Connexion Bureau à distance</span>
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v fClientDisableUDP /t REG_DWORD /d 1 /f
+
+<span class="c"># 3. (Alternative côté VM) : « Sélectionner les protocoles de transport RDP » = TCP uniquement</span>
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v SelectTransport /t REG_DWORD /d 1 /f</code></pre>
+    <p>Cohérent avec une VIP qui ne relaie que TCP : on supprime toute tentative UDP vouée à l&rsquo;échec. Impact : perte des optimisations UDP (fluidité sur liens à latence) — acceptable en LAN/datacenter.</p>
+  </div>
+
+  <div class="encadre crit">
+    <b class="titre">À ne pas faire</b>
+    Ne pas désactiver la NLA côté serveurs (<i>« Autoriser les connexions uniquement à partir d&rsquo;ordinateurs exécutant la NLA » décoché</i>) et ne pas déployer <code>enablecredsspsupport:i:0</code> aux utilisateurs : cela exposerait l&rsquo;écran d&rsquo;ouverture de session des VM à tout le réseau et annulerait la protection anti-bruteforce/anti-DoS de la NLA. Ces leviers restent réservés au diagnostic. De même, ne pas réautoriser NTLM globalement au niveau du domaine.
+  </div>
+</section>
+
+<section id="durable">
+  <h2><span class="num">07</span>Correctifs durables (architecture cible)</h2>
+
+  <h3>7.1 — Recommandé : remplacer le relais TCP par une brique de session supportée (RD Connection Broker ± RD Gateway)</h3>
+  <p>La cause de fond est architecturale : <b>un pool de machines derrière un nom unique ne peut pas fonctionner en Kerberos</b>, car le SPN <code>TERMSRV/&lt;nom&gt;</code> ne peut appartenir qu&rsquo;à une seule machine. Le composant Microsoft conçu pour ce besoin est le <b>RD Connection Broker</b> : le client est redirigé vers la VM finale <i>sous son vrai nom</i>, la NLA s&rsquo;effectue donc contre l&rsquo;hôte réel (Kerberos OK, certificat OK), et le broker apporte en prime la <b>reconnexion à la session existante</b> — ce que la VIP ne garantit pas (une reconnexion peut aujourd&rsquo;hui atterrir sur une autre VM du pool selon l&rsquo;affinité). Pour les accès externes ou pour conserver un point d&rsquo;entrée unique en 443, ajouter un <b>RD Gateway</b> devant le broker.</p>
+  <p>Bénéfices : suppression définitive de la dépendance NTLM, compatibilité native avec les durcissements 25H2 et suivants (la trajectoire Microsoft — EPA, retrait NTLM, avertissements .rdp d&rsquo;avril 2026 — continuera de pénaliser les relais génériques), gestion de session correcte, supervision centralisée.</p>
+
+  <h3>7.2 — Si la VIP doit être conservée : certificats d&rsquo;entreprise au nom de la VIP + NTLMv2 encadré</h3>
+  <p>À défaut de broker, fiabiliser l&rsquo;existant en deux volets :</p>
+  <p><b>(a) Identité TLS.</b> Émettre depuis l&rsquo;AC interne un certificat RDP par VM contenant en SAN <b>le FQDN de la machine et le FQDN de la VIP</b> (gabarit dupliqué avec EKU « Remote Desktop Authentication », OID <code>1.3.6.1.4.1.311.54.1.2</code>). Exemple de requête par hôte :</p>
+<pre><code><span class="c">; rdp_cert.inf — à adapter par VM</span>
+[NewRequest]
+Subject = "CN=vm-prod-042.exemple.fr"
+KeyLength = 2048
+MachineKeySet = TRUE
+[Extensions]
+2.5.29.17 = "{text}dns=vm-prod-042.exemple.fr&amp;dns=vip.exemple.fr"
+[RequestAttributes]
+CertificateTemplate = RDP-VIP
+
+<span class="c"># Soumission puis liaison du certificat au listener RDP (PowerShell, par VM) :</span>
+certreq -new rdp_cert.inf rdp_cert.req
+certreq -submit -config "CA01\AC-Interne" rdp_cert.req rdp_cert.cer
+certreq -accept rdp_cert.cer
+$thumb = (Get-ChildItem Cert:\LocalMachine\My | Where-Object Subject -like "*vm-prod-042*").Thumbprint
+Set-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name SSLCertificateSHA1Hash -Value $thumb
+Restart-Service TermService -Force   <span class="c"># ou au prochain redémarrage planifié</span></code></pre>
+  <p><b>(b) Authentification.</b> Le certificat règle l&rsquo;identité TLS mais ne rend pas Kerberos possible pour un pool : l&rsquo;exception NTLM de l&rsquo;option A devient alors pérenne. L&rsquo;encadrer : NTLMv2 uniquement (LmCompatibilityLevel = 5), audit permanent 8001–8004, exception limitée au nom VIP, revue semestrielle. Acter formellement cette dette de sécurité.</p>
+
+  <h3>7.3 — Hygiène du pool et du socle</h3>
+  <ul>
+    <li><b>Sysprep systématique</b> de toute image clonée (<code>sysprep /generalize</code>) — pré-requis désormais bloquant, plus seulement une bonne pratique.</li>
+    <li><b>Patching</b> : maintenir clients et VM au niveau des cumulatives courantes (correctifs transport RDP de mars 2026, ajustements SID/EPA depuis octobre 2025).</li>
+    <li><b>VIP</b> : affinité par IP source obligatoire tant que le relais subsiste, et supervision du taux d&rsquo;échec de connexion par build client (détection précoce des prochains durcissements — Microsoft en livre à chaque vague, ex. avertissements .rdp d&rsquo;avril 2026).</li>
+    <li><b>Sortie de NTLM</b> : inscrire la suppression de l&rsquo;exception NTLM comme critère de clôture du chantier 7.1.</li>
+  </ul>
+</section>
+
+<section id="runbook">
+  <h2><span class="num">08</span>Protocole d&rsquo;exécution détaillé (runbook)</h2>
+  <p>Séquencement recommandé pour un incident P1, avec points de contrôle GO / NO-GO. Les horaires sont indicatifs à partir de T0 (décision d&rsquo;engager le runbook).</p>
+
+  <ol class="etapes">
+    <li>
+      <b>Phase 0 — Cadrage et préservation (T0 → T0+30 min)</b>
+      <ul>
+        <li>Geler tout changement sur la chaîne RDP (GPO, VIP, images) ; ouvrir le canal d&rsquo;incident et informer le support utilisateurs (consigne provisoire : connexion directe au FQDN de la VM attribuée si connu).</li>
+        <li>Collecter et archiver : capture du message d&rsquo;erreur, <code>gpresult /h</code> d&rsquo;un poste impacté, export des journaux NTLM/RDPClient (client) et Sécurité/Système (une VM), configuration de la VIP.</li>
+        <li>Constituer le périmètre de test : 1 poste 25H2 impacté, 1 poste 23H2/24H2 témoin, 2 VM du pool, 1 compte de test.</li>
+      </ul>
+    </li>
+    <li>
+      <b>Phase 1 — Qualification (T0+30 → T0+90 min)</b>
+      <ul>
+        <li>Dérouler intégralement la section 05 et renseigner le tableau de décision.</li>
+        <li><span class="go">GO</span> une cause est désignée (H1–H4) → Phase 2 avec l&rsquo;option correspondante.</li>
+        <li><span class="nogo">NO-GO</span> aucun constat ne matche → ouvrir un cas Microsoft (joindre les collectes de la Phase 0), maintenir le mode dégradé « accès direct », ne rien modifier à l&rsquo;aveugle.</li>
+      </ul>
+    </li>
+    <li>
+      <b>Phase 2 — Pilote (T0+90 min → T0+3 h)</b>
+      <ul>
+        <li>Appliquer l&rsquo;option retenue (A/B/C/D, section 06) sur l&rsquo;OU pilote (5–10 postes) uniquement.</li>
+        <li>Critères de succès : connexion via VIP rétablie sur 100 % du pilote, aucun nouvel événement de blocage (NTLM 8004, LsaSrv 6167), connexion directe toujours fonctionnelle, aucun impact sur d&rsquo;autres flux (SMB, impression).</li>
+        <li><span class="go">GO</span> critères atteints pendant 1 h d&rsquo;observation → Phase 3. <span class="nogo">NO-GO</span> → rollback immédiat du pilote (tableau ci-dessous), retour Phase 1 avec les nouveaux éléments.</li>
+      </ul>
+    </li>
+    <li>
+      <b>Phase 3 — Généralisation et supervision (T0+3 h → T0+48 h)</b>
+      <ul>
+        <li>Étendre la GPO à l&rsquo;ensemble des postes 25H2 (lien d&rsquo;OU, <code>gpupdate</code> forcé ou attente du cycle), communiquer le rétablissement.</li>
+        <li>Surveiller 48 h : volumétrie des tickets, événements NTLM 8001–8004 (l&rsquo;exception doit produire de l&rsquo;audit, pas du blocage), 4625 côté VM, stabilité des sessions (détection H4 résiduelle).</li>
+        <li>Clore l&rsquo;incident avec les preuves de rétablissement.</li>
+      </ul>
+    </li>
+    <li>
+      <b>Phase 4 — Post-incident (semaine 1 → trimestre)</b>
+      <ul>
+        <li>Rédiger le REX : cause confirmée, durée d&rsquo;impact, efficacité du runbook.</li>
+        <li>Lancer le chantier cible (section 07) : décision broker RDS / RD Gateway vs VIP+certificats, planification Sysprep du pool si H2, <b>date de retrait de l&rsquo;exception NTLM</b> inscrite au backlog sécurité.</li>
+        <li>Mettre sous radar les vagues de durcissement Microsoft à venir (notes de version mensuelles, page « Windows release health ») avec test systématique du chemin VIP sur un poste pilote avant déploiement des cumulatives.</li>
+      </ul>
+    </li>
+  </ol>
+
+  <h3>Réversibilité (rollback par option)</h3>
+  <table>
+    <tr><th>Option</th><th>Action de retour arrière</th><th>Délai</th></tr>
+    <tr><td><b>A</b> — exception NTLM</td><td>Supprimer <code>ClientAllowedNTLMServers</code>, restaurer <code>RestrictSendingNTLMTraffic</code> à sa valeur d&rsquo;origine (GPO ramenée à l&rsquo;état antérieur), <code>gpupdate /force</code>.</td><td>&lt; 15 min</td></tr>
+    <tr><td><b>B</b> — mitigation SID</td><td>Retrait du package de stratégie Microsoft (procédure fournie avec le package) ; aucune autre modification à annuler.</td><td>&lt; 30 min</td></tr>
+    <tr><td><b>C</b> — authentification serveur « Avertir »</td><td>Repasser la GPO « Configurer l&rsquo;authentification du serveur pour le client » à sa valeur antérieure.</td><td>&lt; 15 min</td></tr>
+    <tr><td><b>D</b> — TCP only</td><td>Supprimer <code>fClientDisableUDP</code> / <code>SelectTransport</code> (la cumulative installée, elle, n&rsquo;est pas désinstallée).</td><td>&lt; 15 min</td></tr>
+  </table>
+</section>
+
+<section id="erreurs">
+  <h2><span class="num">09</span>Référentiel erreurs &amp; événements utiles</h2>
+  <table>
+    <tr><th style="width:38%">Message / événement</th><th>Interprétation</th><th style="width:14%">Hypothèse</th></tr>
+    <tr><td>« Une erreur d&rsquo;authentification s&rsquo;est produite. La fonction demandée n&rsquo;est pas prise en charge » + mention du blocage NTLM ou de CredSSP</td><td>La bascule NTLM de la NLA a été refusée (politique Restreindre NTLM, durcissement CredSSP).</td><td>H1</td></tr>
+    <tr><td><code>KDC_ERR_S_PRINCIPAL_UNKNOWN</code> (0x7) sur <code>klist get TERMSRV/vip</code></td><td>Aucun SPN pour le nom demandé : Kerberos est structurellement impossible via la VIP.</td><td>H1</td></tr>
+    <tr><td>Erreur <code>0x80090322</code> (SEC_E_WRONG_PRINCIPAL)</td><td>Le principal/identité du serveur ne correspond pas au nom demandé.</td><td>H1 / H3</td></tr>
+    <tr><td>Journal NTLM/Operational 8001–8004</td><td>Audit (8001/8002) ou blocage du trafic NTLM ; la cible mentionnée confirme le flux concerné.</td><td>H1</td></tr>
+    <tr><td>Sécurité 4625 côté VM, package « NTLM »</td><td>La VM a reçu et refusé une authentification NTLM.</td><td>H1 / H2</td></tr>
+    <tr><td>Système LsaSrv <b>6167</b> « partial mismatch in the machine ID » / <code>SEC_E_NO_CREDENTIALS</code></td><td>Contrôle d&rsquo;unicité des SID machine déclenché (clones sans Sysprep).</td><td>H2</td></tr>
+    <tr><td>« L&rsquo;identité de l&rsquo;ordinateur distant ne peut pas être vérifiée » / erreur de certificat</td><td>Validation d&rsquo;identité serveur : nom du certificat ≠ nom demandé (VIP) ou AC non approuvée.</td><td>H3</td></tr>
+    <tr><td>Connexion établie puis écran noir, gel, déconnexion ; build &lt; mars 2026</td><td>Régression transport UDP (KB5079473), corrigée par KB5085516.</td><td>H4</td></tr>
+    <tr><td>TerminalServices-RDPClient/Operational 1026, 1105</td><td>Codes de déconnexion côté client — à corréler avec l&rsquo;horodatage des tests.</td><td>Toutes</td></tr>
+  </table>
+</section>
+
+<section id="risques">
+  <h2><span class="num">10</span>Risques et points de vigilance</h2>
+  <p><b>Réintroduction de NTLM (option A).</b> NTLM via un relais est exactement le schéma d&rsquo;attaque (relay) que l&rsquo;EPA et la dépréciation NTLM visent à éliminer. L&rsquo;exception doit donc rester nominative (le seul nom de la VIP), auditée en continu, documentée comme dette avec une date de retrait, et compensée (NTLMv2 imposé, signature SMB, supervision des 8001–8004). Toute demande d&rsquo;élargissement de l&rsquo;exception doit passer par la filière sécurité.</p>
+  <p><b>Récidive à chaque vague de durcissement.</b> Microsoft poursuit le retrait de NTLM et le renforcement RDP (EPA 2025, contrôles SID, avertissements .rdp d&rsquo;avril 2026). Tant que l&rsquo;architecture VIP-relais subsiste, chaque cumulative est susceptible de recasser le flux : d&rsquo;où l&rsquo;importance du test pilote pré-déploiement (Phase 4) et du chantier cible 7.1.</p>
+  <p><b>Continuité de session.</b> Même rétablie, la VIP ne garantit pas la reconnexion à la session existante (affinité IP source uniquement). Les déconnexions réseau peuvent renvoyer l&rsquo;utilisateur sur une autre VM avec une session orpheline sur la première — le broker RDS résout ce point nativement.</p>
+  <p><b>Désactivation de la NLA.</b> Écartée : exposition directe du winlogon des VM, perte de la protection pré-authentification. Ne doit apparaître dans aucun correctif, même temporaire.</p>
+  <p><b>Périmètre des GPO.</b> Cibler les OU exactes (postes 25H2 / VM du pool) ; une exception NTLM appliquée par mégarde au domaine entier constituerait une régression de sécurité majeure. Vérifier l&rsquo;héritage et le filtrage de sécurité avant liaison.</p>
+</section>
+
+<section id="references">
+  <h2><span class="num">11</span>Références</h2>
+  <ul>
+    <li>Microsoft Learn — Windows release health, « Resolved issues in Windows 11, version 25H2 » : <a href="https://learn.microsoft.com/en-us/windows/release-health/resolved-issues-windows-11-25h2">learn.microsoft.com/…/resolved-issues-windows-11-25h2</a></li>
+    <li>Microsoft Q&amp;A — blocages Kerberos/NTLM et RDP liés aux SID dupliqués sur 25H2 (KB5064081 / KB5065426, LsaSrv 6167, package de mitigation via le support) : <a href="https://learn.microsoft.com/en-us/answers/questions/5635598/25h2-cloned-computers-cannot-connect-to-rdp-admins">learn.microsoft.com/…/25h2-cloned-computers-cannot-connect</a></li>
+    <li>Microsoft Q&amp;A — échecs RDP Kerberos/NTLM après 24H2/25H2 (bascule NTLM bloquée, CredSSP) : <a href="https://learn.microsoft.com/en-us/answers/questions/2195946/after-update-to-latest-win-11-24h2-rdp-kerberos-au">learn.microsoft.com/…/after-update-to-latest-win-11-24h2</a></li>
+    <li>Microsoft Learn — Kerberos et SPN sur adresses IP (« Configuring Kerberos over IP ») : <a href="https://learn.microsoft.com/en-us/windows-server/security/kerberos/configuring-kerberos-over-ip">learn.microsoft.com/…/configuring-kerberos-over-ip</a></li>
+    <li>Microsoft Learn — Remote Desktop Connection Broker (répartition et reconnexion de sessions) : <a href="https://learn.microsoft.com/en-us/windows-server/remote/remote-desktop-services/rds-connection-broker-cluster">learn.microsoft.com/…/rds-connection-broker</a></li>
+    <li>Windows OS Hub — blocage des connexions NTLM sur Windows 11 / Server 2025 et erreurs RDP associées : <a href="https://woshub.com/block-ntlm-connections-windows/">woshub.com/block-ntlm-connections-windows</a> ; dépannage RDP Windows 11 : <a href="https://woshub.com/rdp-not-working-windows-11/">woshub.com/rdp-not-working-windows-11</a></li>
+    <li>Régression transport RDP 25H2 (KB5079473) et correctif KB5085516 du 21/03/2026 : <a href="https://thegeekpage.com/how-to-fix-rdp-broken-after-kb5079473-25h2-update-on-windows-11/">thegeekpage.com/…/rdp-broken-after-kb5079473</a></li>
+    <li>Durcissements RDP d&rsquo;avril 2026 (KB5083769, avertissements fichiers .rdp) : <a href="https://windowsforum.com/threads/windows-11-april-2026-rdp-warning-bug-kb5083769-and-kb5082052-fixes-needed.414962/">windowsforum.com/…/kb5083769</a></li>
+  </ul>
+</section>
+
+<footer>
+  Rapport généré le 12 juin 2026 — INC-RDP-25H2-001. Les noms <code>vip.exemple.fr</code> / <code>vm-prod-0xx.exemple.fr</code>, les chemins d&rsquo;OU et les références de GPO internes sont à substituer par les valeurs de votre environnement. Les numéros de KB cités correspondent à l&rsquo;état public connu au 12/06/2026 : vérifier les dernières cumulatives sur Windows release health avant déploiement.
+</footer>
+
+</main>
+</body>
+</html>
