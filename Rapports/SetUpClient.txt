@@ -1,0 +1,75 @@
+La solution, en clair
+On garde NLA/CredSSP activé (on ne tombe pas dans le enablecredsspsupport:i:0, qui supprime la pré-auth). On débloque la délégation au niveau de la politique, pour les trois types d'identifiants (saisis / SSO / enregistrés), scopée au nom de la VIP. Trois leviers, tous sur le client :
+
+Désactiver l'exigence Remote Credential Guard / Restricted Admin (sinon elle interdit la délégation classique).
+Activer Allow…CredentialsWhenNTLMOnly (Fresh + Def + Saved) avec TERMSRV/zxr10-lb-coop-mcn.yres.ytech en liste.
+Remettre Encryption Oracle au défaut (les deux machines sont patchées — le =2 n'était qu'un voile de diagnostic).
+
+Le serveur n'a rien à changer pour la délégation classique (NLA déjà actif, NTLM machine déjà prouvé OK par le netlogon 0x0).
+Protocole détaillé
+Phase 0 — Pré-requis (client)
+:: D'ou viennent les politiques de delegation ? (essentiel : voir si une GPO reverrouille)
+gpresult /h %temp%\gp.html  &  start %temp%\gp.html
+
+:: Credential Guard local actif ? (impacte SSO/enregistres, pas les creds saisis)
+reg query "HKLM\System\CurrentControlSet\Control\LSA" /v LsaCfgFlags
+tasklist | findstr /i lsaiso
+Phase 1 — Configuration client (PowerShell admin)
+powershell# === Delegation d'identifiants RDP sans Kerberos (auth serveur NTLM) — CLIENT ===
+$Target = "TERMSRV/zxr10-lb-coop-mcn.yres.ytech"   # liste blanche ; ou "TERMSRV/*"
+$CD = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation"
+New-Item -Path $CD -Force | Out-Null
+
+# 1) Lever l'exigence RCG / Restricted Admin (sinon delegation classique interdite)
+New-ItemProperty -Path $CD -Name "RestrictedRemoteAdministration" -PropertyType DWord -Value 0 -Force | Out-Null
+
+# 2) Autoriser la delegation NTLM-only pour les 3 types d'identifiants
+#    Fresh = saisis a la connexion | Def = SSO (user courant) | Saved = enregistres
+$map = @{
+  "AllowFreshCredentialsWhenNTLMOnly" = "ConcatenateDefaults_AllowFreshNTLMOnly"
+  "AllowDefCredentialsWhenNTLMOnly"   = "ConcatenateDefaults_AllowDefNTLMOnly"
+  "AllowSavedCredentialsWhenNTLMOnly" = "ConcatenateDefaults_AllowSavedNTLMOnly"
+}
+foreach ($flag in $map.Keys) {
+  New-ItemProperty -Path $CD -Name $flag        -PropertyType DWord  -Value 1 -Force | Out-Null
+  New-ItemProperty -Path $CD -Name $map[$flag]  -PropertyType DWord  -Value 1 -Force | Out-Null
+  $sub = Join-Path $CD $flag
+  New-Item -Path $sub -Force | Out-Null
+  New-ItemProperty -Path $sub -Name "1" -PropertyType String -Value $Target -Force | Out-Null
+}
+
+# 3) Encryption Oracle au defaut (les 2 machines sont patchees)
+$P = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\CredSSP\Parameters"
+if (Test-Path $P) { Remove-ItemProperty -Path $P -Name "AllowEncryptionOracle" -ErrorAction SilentlyContinue }
+
+Write-Host "OK. Si une GPO de domaine pousse CredentialsDelegation, ces cles seront ecrasees au prochain gpupdate."
+Phase 2 — Cas Credential Guard local actif
+Si LsaCfgFlags vaut 1/2 ou lsaiso.exe tourne : le SSO et les identifiants enregistrés ne se délégueront pas en NTLM (CG ne livre pas leur matériel). Connecte-toi alors avec des identifiants saisis à la main — c'est le canal « Fresh », couvert par AllowFreshCredentialsWhenNTLMOnly, et que CG autorise. Si tu exiges le SSO, il faut désactiver CG (régression lourde, souvent verrouillée UEFI) :
+reg add "HKLM\System\CurrentControlSet\Control\LSA" /v LsaCfgFlags /t REG_DWORD /d 0 /f
+:: + suppression du verrou VBS/UEFI puis REDEMARRAGE ; a ne faire qu'en connaissance de cause
+Phase 3 — Test (client)
+Crée test-vip.rdp :
+full address:s:zxr10-lb-coop-mcn.yres.ytech
+enablecredsspsupport:i:1
+authentication level:i:2
+Lance-le, saisis les identifiants. Avant/après, confirme que c'est bien du NTLM (aucun ticket pour la VIP) :
+klist purge
+:: ... connexion ...
+klist        :: ne doit PAS contenir TERMSRV/zxr10-lb-coop-mcn.yres.ytech
+La connexion doit aboutir alors que klist ne montre aucun ticket Kerberos pour la VIP → délégation NTLM réussie.
+Phase 4 — Pérennisation par GPO (obligatoire si GPO de domaine)
+Tes reg add locaux seront écrasés. Sur un DC, dans GPMC, crée une GPO (ex. RDP-Deleg-NTLM-VIP) liée à l'OU des postes clients concernés, puis : Configuration ordinateur > Modèles d'administration > Système > Délégation d'informations d'identification :
+
+« Restreindre la délégation des informations d'identification aux serveurs distants » → Désactivé
+« Autoriser la délégation des informations d'identification récentes avec authentification du serveur NTLM uniquement » → Activé, liste TERMSRV/zxr10-lb-coop-mcn.yres.ytech
+idem « … par défaut … NTLM uniquement » et « … enregistrées … NTLM uniquement »
+
+(TERMSRV en majuscules, nom identique à celui composé dans mstsc.) Puis gpupdate /force sur le client.
+Phase 5 — Validation
+Connexion via la VIP qui aboutit, klist sans ticket VIP, et plus aucune erreur 226 dans RDPClient/Operational à l'horodatage. Côté serveur, un 4624 (logon réussi) NTLM doit apparaître.
+Je mets le fichier à jour avec tout ça.Fichier modifié, lu un fichierFichier modifié, lu un fichierLe fichier est à jour : la solution complète et le protocole détaillé sont ajoutés en section 11, après tout l'historique de diagnostic, avec aussi la variante .reg si tu préfères au PowerShell.
+Pour résumer la logique de la solution : on garde NLA actif (on ne tombe pas dans le enablecredsspsupport:i:0 qui supprimait la pré-auth), et on débloque uniquement la politique de délégation côté client — désactiver l'exigence RCG/Restricted Admin, autoriser Allow{Fresh,Def,Saved}CredentialsWhenNTLMOnly scopé sur le SPN de la VIP, et remettre l'oracle au défaut. Le serveur n'a rien à changer puisque le NTLM machine passait déjà (netlogon 0x0).
+Deux points à ne pas perdre de vue à l'exécution :
+Si Credential Guard local est actif (à vérifier en phase 0), le SSO et les identifiants enregistrés ne se délégueront pas — il faudra des identifiants saisis à la main, qui eux passent par le canal « Fresh » autorisé. C'est probablement ce qui explique que tes premières clés Allow…NTLMOnly n'aient rien changé, vu que ton 4020 était en SSO.
+Et la pérennisation doit passer par GPO (phase 4) si une stratégie de domaine pousse CredentialsDelegation : sinon tes clés locales sont écrasées au prochain gpupdate. Le gpresult /h de la phase 0 te dira si c'est le cas.
+C'est une configuration qui assume un recul sur le durcissement — à documenter pour qui possède le risque. L'atténuation réelle dans ton cas, c'est que la F5 en L4 ne casse pas le TLS, donc le channel binding reste intact de bout en bout, ce qui limite l'exposition par rapport à un proxy L7. Le broker RDS reste la voie qui rétablirait Kerberos sans rien céder, si l'arbitrage penche un jour de ce côté.
