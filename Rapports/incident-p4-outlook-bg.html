@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Incident P4 — Pop-up de mot de passe sur les boîtes groupe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F6F7FA; --card:#FFFFFF;
+    --ink:#15233D; --ink-soft:#46566F; --ink-faint:#8A98AD;
+    --line:#DCE1EA; --line-strong:#C3CCDA; --rail:#0F1B30;
+    --n-acc:#B5701A; --n-bg:#FBF1E2;
+    --v-acc:#0E7257; --v-bg:#E3F2EC;
+    --alert:#B23A2E; --alert-bg:#FAE9E6; --focus:#1E5FB0;
+    --shadow:0 1px 2px rgba(21,35,61,.05),0 8px 24px rgba(21,35,61,.06);
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.62;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto;padding:0 24px}
+
+  header.masthead{padding:64px 0 34px}
+  .eyebrow{font-family:var(--mono);font-size:12.5px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-faint);display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-bottom:22px}
+  .eyebrow b{color:var(--alert);font-weight:600}
+  .eyebrow .dot{width:4px;height:4px;border-radius:50%;background:var(--line-strong)}
+  h1{font-size:clamp(30px,5.4vw,46px);line-height:1.08;font-weight:700;letter-spacing:-.022em;margin:0 0 20px}
+  h1 .hl{color:var(--alert)}
+  .lede{font-size:clamp(17px,2.4vw,19px);color:var(--ink-soft);max-width:62ch;margin:0}
+  .meta-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:26px}
+  .mchip{font-family:var(--mono);font-size:12px;font-weight:500;padding:5px 11px;border:1px solid var(--line-strong);border-radius:999px;color:var(--ink-soft);background:var(--card)}
+
+  section.block{display:grid;grid-template-columns:54px 1fr;gap:26px;padding:40px 0;border-top:1px solid var(--line)}
+  .rail-num{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--ink-faint);padding-top:4px}
+  .block-body{min-width:0}
+  h2{font-size:clamp(21px,3vw,27px);font-weight:600;letter-spacing:-.015em;margin:0 0 6px}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--v-acc);font-weight:600;margin:0 0 14px}
+  p{margin:0 0 16px} .block-body p:last-child{margin-bottom:0}
+  strong{font-weight:600}
+  .mono{font-family:var(--mono);font-size:.9em;background:#EEF1F6;border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--ink);white-space:nowrap}
+  .tok{font-family:var(--mono);font-size:.86em;font-weight:600;padding:2px 8px;border-radius:5px;white-space:nowrap;display:inline-block}
+  .tok-n{color:var(--n-acc);background:var(--n-bg);border:1px solid #E6CDA6}
+  .tok-v{color:var(--v-acc);background:var(--v-bg);border:1px solid #B6DCCD}
+  .tok-grp{color:var(--ink);background:#EDEFF4;border:1px solid var(--line-strong)}
+
+  .callout{border-radius:12px;padding:22px 24px;margin:6px 0 20px;border:1px solid var(--line)}
+  .callout .lab{font-family:var(--mono);font-size:11.5px;letter-spacing:.13em;text-transform:uppercase;font-weight:600;display:block;margin-bottom:8px}
+  .callout p{margin-bottom:10px}.callout p:last-child{margin-bottom:0}
+  .verdict{background:var(--card);box-shadow:var(--shadow);border-left:4px solid var(--alert)}
+  .verdict .lab{color:var(--alert)}
+  .reco{background:var(--v-bg);border-color:#BFE0D3;border-left:4px solid var(--v-acc)}
+  .reco .lab{color:var(--v-acc)}
+  .warn{background:var(--n-bg);border-color:#E9D2AD;border-left:4px solid var(--n-acc)}
+  .warn .lab{color:var(--n-acc)}
+
+  .tbl{width:100%;border-collapse:collapse;font-size:15px;margin:4px 0 8px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .tbl th,.tbl td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  .tbl th{background:#EEF1F6;font-weight:600;font-size:12.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-soft)}
+  .tbl tr:last-child td{border-bottom:none}
+  .tbl td:first-child{font-family:var(--mono);font-weight:600;color:var(--ink);white-space:nowrap}
+
+  figure.diagram{margin:10px 0 6px;border:1px solid var(--line);border-radius:12px;background:var(--card);box-shadow:var(--shadow);overflow:hidden}
+  .diagram .scroller{overflow-x:auto;padding:18px 18px 10px}
+  .diagram svg{display:block;min-width:660px;width:100%;height:auto}
+  figcaption{font-size:13.5px;color:var(--ink-faint);padding:12px 20px 16px;border-top:1px solid var(--line);margin-top:2px}
+  figcaption b{color:var(--ink-soft);font-weight:600}
+
+  .s-sans{font-family:"IBM Plex Sans",sans-serif}
+  .s-mono{font-family:"IBM Plex Mono",monospace}
+  .s-lbl{font-family:"IBM Plex Mono",monospace;letter-spacing:.07em}
+
+  ul.clean{margin:4px 0 16px;padding-left:0;list-style:none}
+  ul.clean li{position:relative;padding-left:26px;margin-bottom:11px}
+  ul.clean li:before{content:"";position:absolute;left:4px;top:10px;width:7px;height:7px;border-radius:2px;background:var(--v-acc)}
+  ul.clean li:last-child{margin-bottom:0}
+  ol.steps{margin:4px 0 6px;padding-left:0;list-style:none;counter-reset:s}
+  ol.steps li{position:relative;padding-left:42px;margin-bottom:16px;counter-increment:s}
+  ol.steps li:before{content:counter(s);position:absolute;left:0;top:-1px;width:27px;height:27px;border-radius:7px;background:var(--rail);color:#fff;font-family:var(--mono);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+  ol.steps li:last-child{margin-bottom:0}
+  ol.steps b{display:block;margin-bottom:2px}
+
+  footer{background:var(--rail);color:#C8D2E0;margin-top:18px;padding:40px 0 48px}
+  footer h3{color:#fff;font-size:15px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin:0 0 14px}
+  footer p,footer li{font-size:14px;color:#A9B6C9;line-height:1.6}
+  footer ul{margin:0;padding-left:20px}footer li{margin-bottom:7px}
+  footer .legend{display:flex;flex-wrap:wrap;gap:18px;margin:0 0 26px;padding-bottom:22px;border-bottom:1px solid #2A3A55}
+  footer .legend .li{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:12.5px}
+  footer .sw{width:15px;height:15px;border-radius:4px;border:1px solid rgba(255,255,255,.25)}
+
+  a{color:var(--focus)}
+  :focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:3px}
+
+  @media (max-width:640px){
+    .wrap{padding:0 18px}
+    header.masthead{padding:44px 0 26px}
+    section.block{grid-template-columns:1fr;gap:8px;padding:32px 0}
+    .rail-num{padding-top:0}
+  }
+  @media (prefers-reduced-motion:no-preference){
+    section.block,header.masthead>.wrap>*{animation:rise .5s ease both}
+    @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">
+      <span><b>Incident P4</b></span><span class="dot"></span>
+      <span>Outlook</span><span class="dot"></span>
+      <span>Exchange on-prem</span><span class="dot"></span>
+      <span>Boîtes groupe</span>
+    </div>
+    <h1>Le pop-up de mot de passe « aléatoire »<br><span class="hl">n'est pas un défaut de messagerie.</span></h1>
+    <p class="lede">C'est un décalage d'identité&nbsp;: le compte ouvert sur la session Windows n'est pas celui qui détient le FullAccess sur la boîte groupe. Le SSO ne peut donc pas aboutir en silence, et Outlook bascule sur une demande d'identifiants. Vider le coffre-fort ne traite que le symptôme.</p>
+    <div class="meta-chips">
+      <span class="mchip">Domaine ZCA</span>
+      <span class="mchip">Auth. intégrée Kerberos / NTLM</span>
+      <span class="mchip">MAPI over HTTP</span>
+      <span class="mchip">FullAccess + SendAs</span>
+      <span class="mchip">Cas&nbsp;: saisies@camorbi.fr</span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<section class="block">
+  <div class="rail-num">01</div>
+  <div class="block-body">
+    <p class="kicker">Résumé &amp; verdict</p>
+    <h2>Ce qui se passe, en une phrase</h2>
+    <p>Sur un poste physique, l'utilisatrice ajoute plusieurs boîtes groupe (BG) à son profil Outlook. À l'ouverture, certaines BG réclament un mot de passe&nbsp;— pas toutes, et sans logique apparente d'un collaborateur à l'autre. La demande revient à chaque redémarrage, et la purge du coffre-fort Windows n'y change rien.</p>
+    <div class="callout verdict">
+      <span class="lab">Verdict</span>
+      <p>L'utilisatrice ouvre sa session avec <span class="tok tok-n">ZCA\N9999</span>, propriétaire de sa BAL personnelle. Mais le droit <strong>FullAccess</strong> sur la BG <span class="mono">saisies@camorbi.fr</span> est porté par le groupe <span class="tok tok-grp">ZCA\GU_860_Saisie</span>, dont <strong>tous les membres commencent par V</strong>. Le compte connecté <span class="tok tok-n">N9999</span> n'est pas dans ce groupe&nbsp;: il n'a donc <strong>aucun droit</strong> sur cette boîte. Le SSO échoue, Outlook demande des identifiants, et il faut saisir <span class="tok tok-v">ZCA\V9999</span> pour entrer.</p>
+      <p>Ce n'est donc <strong>ni</strong> un bug Outlook, <strong>ni</strong> un cache corrompu&nbsp;: c'est un problème d'<strong>habilitation</strong>. La bonne correction consiste à donner au compte de connexion (le compte <span class="tok tok-n">N</span>) le FullAccess + SendAs sur la BG, via un groupe de sécurité&nbsp;— de façon à rétablir un vrai SSO silencieux.</p>
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="rail-num">02</div>
+  <div class="block-body">
+    <p class="kicker">Acteurs &amp; vocabulaire</p>
+    <h2>Les objets en présence</h2>
+    <p>Tout l'incident se joue sur une seule question&nbsp;: <em>le préfixe du compte connecté est-il présent dans le groupe qui détient le FullAccess de la boîte&nbsp;?</em> Les acteurs&nbsp;:</p>
+    <table class="tbl">
+      <thead><tr><th>Objet</th><th>Rôle dans le cas</th></tr></thead>
+      <tbody>
+        <tr><td>ZCA\N9999</td><td>Compte de la session Windows. Propriétaire de la BAL personnelle <span class="mono">pamela@ca-neo.fr</span>. C'est l'identité présentée par défaut en SSO.</td></tr>
+        <tr><td>ZCA\V9999</td><td>Second compte de la même personne, <strong>membre</strong> du groupe d'accès à la BG. C'est lui qui « marche » dans le pop-up.</td></tr>
+        <tr><td>saisies@camorbi.fr</td><td>La boîte groupe (BG) à ouvrir. Hébergée <strong>on-prem</strong>.</td></tr>
+        <tr><td>GU_860_Saisie</td><td>Groupe de sécurité (GU) portant le droit FullAccess sur la BG. Peuplé exclusivement de comptes en <strong>V…</strong></td></tr>
+        <tr><td>CR</td><td>Caisse régionale en charge du peuplement de la BG et de ses habilitations.</td></tr>
+      </tbody>
+    </table>
+    <p>Élément structurant&nbsp;: l'utilisatrice possède <strong>28 comptes</strong> sur ZCA, vraisemblablement un par CR avec laquelle elle travaille. Selon la BG visée, ce n'est pas toujours le même compte qui détient le droit&nbsp;— c'est la source de la confusion.</p>
+  </div>
+</section>
+
+<section class="block">
+  <div class="rail-num">03</div>
+  <div class="block-body">
+    <p class="kicker">Mécanique</p>
+    <h2>Comment Outlook s'authentifie sur une BG</h2>
+    <p>En Exchange on-prem, Outlook ouvre la BG via une connexion authentifiée par <strong>l'identité de la session Windows</strong> (Negotiate&nbsp;: Kerberos d'abord, NTLM en repli). Exchange vérifie ensuite si <em>cette</em> identité possède le FullAccess sur la boîte cible. Si oui&nbsp;: ouverture silencieuse. Si non&nbsp;: refus, puis demande d'identifiants.</p>
+
+    <figure class="diagram">
+      <div class="scroller">
+        <svg viewBox="0 0 720 392" role="img" aria-label="La session N9999 face à la boite groupe protegee par un groupe de comptes V">
+          <defs><marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#C3CCDA"/></marker></defs>
+          <rect x="14" y="40" width="300" height="320" rx="14" fill="#F2F4F8" stroke="#DCE1EA"/>
+          <text class="s-lbl" x="32" y="66" font-size="11" fill="#8A98AD">POSTE DE TRAVAIL · SESSION WINDOWS</text>
+          <rect x="32" y="78" width="200" height="30" rx="7" fill="#FBF1E2" stroke="#E6CDA6"/>
+          <text class="s-mono" x="44" y="98" font-size="13" font-weight="600" fill="#B5701A">ZCA\N9999</text>
+          <text class="s-sans" x="242" y="98" font-size="11.5" fill="#46566F">identité SSO</text>
+          <rect x="32" y="124" width="266" height="216" rx="10" fill="#FFFFFF" stroke="#C3CCDA"/>
+          <text class="s-mono" x="48" y="148" font-size="13" font-weight="600" fill="#15233D">Outlook — profil de N9999</text>
+          <line x1="48" y1="160" x2="282" y2="160" stroke="#DCE1EA"/>
+          <rect x="48" y="174" width="234" height="46" rx="8" fill="#E3F2EC" stroke="#B6DCCD"/>
+          <text class="s-mono" x="62" y="196" font-size="12.5" font-weight="600" fill="#0E7257">pamela@ca-neo.fr</text>
+          <text class="s-sans" x="62" y="212" font-size="11" fill="#46566F">BAL perso · propriétaire = N9999 · OK</text>
+          <rect x="48" y="232" width="234" height="46" rx="8" fill="#FAE9E6" stroke="#E2B7B0"/>
+          <text class="s-mono" x="62" y="254" font-size="12.5" font-weight="600" fill="#B23A2E">saisies@camorbi.fr</text>
+          <text class="s-sans" x="62" y="270" font-size="11" fill="#46566F">BG ajoutée · pop-up de mot de passe</text>
+          <text class="s-lbl" x="48" y="306" font-size="10.5" fill="#8A98AD">CONNEXION AUTHENTIFIÉE PAR L'IDENTITÉ</text>
+          <text class="s-lbl" x="48" y="322" font-size="10.5" fill="#8A98AD">DE LA SESSION (KERBEROS / NTLM)</text>
+          <line x1="314" y1="256" x2="386" y2="256" stroke="#C3CCDA" stroke-width="1.6" marker-end="url(#ar)" fill="none"/>
+          <rect x="392" y="40" width="314" height="320" rx="14" fill="#F2F4F8" stroke="#DCE1EA"/>
+          <text class="s-lbl" x="410" y="66" font-size="11" fill="#8A98AD">EXCHANGE ON-PREM</text>
+          <rect x="410" y="80" width="278" height="58" rx="10" fill="#FFFFFF" stroke="#C3CCDA"/>
+          <text class="s-mono" x="426" y="104" font-size="13" font-weight="600" fill="#B23A2E">saisies@camorbi.fr</text>
+          <text class="s-sans" x="426" y="123" font-size="11.5" fill="#46566F">Boîte groupe · droits portés par un groupe</text>
+          <line x1="549" y1="138" x2="549" y2="160" stroke="#C3CCDA" stroke-width="1.6" marker-end="url(#ar)" fill="none"/>
+          <text class="s-lbl" x="558" y="154" font-size="10" fill="#8A98AD">FullAccess →</text>
+          <rect x="410" y="162" width="278" height="120" rx="10" fill="#EDEFF4" stroke="#C3CCDA"/>
+          <text class="s-mono" x="426" y="184" font-size="12.5" font-weight="600" fill="#15233D">ZCA\GU_860_Saisie</text>
+          <text class="s-sans" x="426" y="201" font-size="11" fill="#46566F">membres — tous en V…</text>
+          <rect x="426" y="210" width="58" height="24" rx="6" fill="#E3F2EC" stroke="#B6DCCD"/><text class="s-mono" x="436" y="226" font-size="11.5" font-weight="600" fill="#0E7257">V0001</text>
+          <rect x="492" y="210" width="58" height="24" rx="6" fill="#E3F2EC" stroke="#B6DCCD"/><text class="s-mono" x="502" y="226" font-size="11.5" font-weight="600" fill="#0E7257">V9999</text>
+          <rect x="558" y="210" width="58" height="24" rx="6" fill="#E3F2EC" stroke="#B6DCCD"/><text class="s-mono" x="572" y="226" font-size="11.5" font-weight="600" fill="#0E7257">V…</text>
+          <rect x="426" y="244" width="246" height="26" rx="6" fill="#FFFFFF" stroke="#E2B7B0" stroke-dasharray="4 3"/>
+          <text class="s-mono" x="438" y="261" font-size="11.5" font-weight="600" fill="#B5701A">ZCA\N9999</text>
+          <text class="s-sans" x="556" y="261" font-size="11.5" fill="#B23A2E" font-weight="600">✗ non membre</text>
+          <text class="s-sans" x="410" y="312" font-size="12" font-weight="600" fill="#B23A2E">Le compte connecté n'est pas dans le groupe</text>
+          <text class="s-sans" x="410" y="330" font-size="11.5" fill="#46566F">→ aucune habilitation sur la boîte → refus du SSO</text>
+        </svg>
+      </div>
+      <figcaption><b>Lecture&nbsp;:</b> la BAL perso s'ouvre en silence car N9999 en est propriétaire. La BG, elle, n'accepte que les comptes membres de <span class="tok tok-grp">GU_860_Saisie</span>&nbsp;— or ce sont des comptes V, pas N9999.</figcaption>
+    </figure>
+
+    <p style="margin-top:18px"><strong>À noter sur l'auto-mapping&nbsp;:</strong> quand le FullAccess est accordé à un <em>groupe</em> (et non directement à un compte), Exchange ne déclenche pas l'auto-mapping. C'est cohérent avec le fait que les BG soient ici <strong>ajoutées manuellement</strong> au profil.</p>
+  </div>
+</section>
+
+<section class="block">
+  <div class="rail-num">04</div>
+  <div class="block-body">
+    <p class="kicker">Le défaut, pas à pas</p>
+    <h2>Pourquoi le pop-up apparaît</h2>
+    <p>La séquence est entièrement déterministe&nbsp;— rien d'aléatoire dans le moteur. Le contrôle d'accès tombe, et la seule issue pour Outlook est de réclamer une autre identité.</p>
+
+    <figure class="diagram">
+      <div class="scroller">
+        <svg viewBox="0 0 720 430" role="img" aria-label="Sequence d'authentification aboutissant au pop-up puis a la reussite avec le compte V">
+          <defs><marker id="aR" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#7E8AA0"/></marker></defs>
+          <text class="s-mono" x="78" y="34" font-size="12.5" font-weight="600" text-anchor="middle" fill="#15233D">Utilisatrice</text>
+          <text class="s-mono" x="360" y="34" font-size="12.5" font-weight="600" text-anchor="middle" fill="#15233D">Outlook</text>
+          <text class="s-mono" x="642" y="34" font-size="12.5" font-weight="600" text-anchor="middle" fill="#15233D">Exchange</text>
+          <line x1="78" y1="46" x2="78" y2="406" stroke="#C3CCDA" stroke-dasharray="3 4"/>
+          <line x1="360" y1="46" x2="360" y2="406" stroke="#C3CCDA" stroke-dasharray="3 4"/>
+          <line x1="642" y1="46" x2="642" y2="406" stroke="#C3CCDA" stroke-dasharray="3 4"/>
+
+          <line x1="360" y1="72" x2="636" y2="72" stroke="#7E8AA0" stroke-width="1.5" marker-end="url(#aR)"/>
+          <text class="s-sans" x="362" y="65" font-size="11.5" fill="#46566F"><tspan font-weight="700" fill="#15233D">1.</tspan> Ouvrir <tspan class="s-mono" fill="#15233D">saisies@camorbi.fr</tspan> — SSO = <tspan class="s-mono" fill="#B5701A" font-weight="600">N9999</tspan></text>
+
+          <path d="M642,98 h44 v34 h-44" stroke="#7E8AA0" stroke-width="1.5" fill="none" marker-end="url(#aR)"/>
+          <text class="s-sans" x="470" y="112" font-size="11.5" fill="#46566F"><tspan font-weight="700" fill="#15233D">2.</tspan> Contrôle&nbsp;: <tspan class="s-mono" fill="#B5701A">N9999</tspan> ∈ groupe&nbsp;?</text>
+          <text class="s-sans" x="470" y="129" font-size="11.5" font-weight="700" fill="#B23A2E">→ NON</text>
+
+          <line x1="636" y1="158" x2="364" y2="158" stroke="#7E8AA0" stroke-width="1.5" marker-end="url(#aR)"/>
+          <text class="s-sans" x="362" y="151" font-size="11.5" fill="#46566F"><tspan font-weight="700" fill="#15233D">3.</tspan> Accès refusé</text>
+
+          <line x1="356" y1="190" x2="84" y2="190" stroke="#B23A2E" stroke-width="2" marker-end="url(#aR)"/>
+          <rect x="92" y="198" width="244" height="30" rx="7" fill="#FAE9E6" stroke="#E2B7B0"/>
+          <text class="s-sans" x="104" y="217" font-size="11.5" fill="#B23A2E" font-weight="600">4. 🔒 Pop-up&nbsp;: « saisir des identifiants »</text>
+
+          <line x1="78" y1="256" x2="356" y2="256" stroke="#7E8AA0" stroke-width="1.5" marker-end="url(#aR)"/>
+          <text class="s-sans" x="98" y="249" font-size="11.5" fill="#46566F"><tspan font-weight="700" fill="#15233D">5.</tspan> Saisie de <tspan class="s-mono" fill="#0E7257" font-weight="600">ZCA\V9999</tspan> + mot de passe</text>
+
+          <line x1="360" y1="288" x2="636" y2="288" stroke="#7E8AA0" stroke-width="1.5" marker-end="url(#aR)"/>
+          <text class="s-sans" x="362" y="281" font-size="11.5" fill="#46566F"><tspan font-weight="700" fill="#15233D">6.</tspan> Nouvelle tentative avec <tspan class="s-mono" fill="#0E7257" font-weight="600">V9999</tspan></text>
+
+          <path d="M642,308 h44 v34 h-44" stroke="#7E8AA0" stroke-width="1.5" fill="none" marker-end="url(#aR)"/>
+          <text class="s-sans" x="470" y="322" font-size="11.5" fill="#46566F"><tspan font-weight="700" fill="#15233D">7.</tspan> <tspan class="s-mono" fill="#0E7257">V9999</tspan> ∈ groupe&nbsp;?</text>
+          <text class="s-sans" x="470" y="339" font-size="11.5" font-weight="700" fill="#0E7257">→ OUI</text>
+
+          <line x1="636" y1="368" x2="364" y2="368" stroke="#0E7257" stroke-width="2" marker-end="url(#aR)"/>
+          <rect x="150" y="376" width="190" height="30" rx="7" fill="#E3F2EC" stroke="#B6DCCD"/>
+          <text class="s-sans" x="162" y="395" font-size="11.5" fill="#0E7257" font-weight="600">8. ✓ Boîte groupe ouverte</text>
+        </svg>
+      </div>
+      <figcaption><b>Le redémarrage&nbsp;:</b> à chaque relance, Outlook rejoue cette séquence. Tant que l'identité de session reste <span class="tok tok-n">N9999</span>, l'étape 2 retombe sur « NON » et le pop-up revient.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="block">
+  <div class="rail-num">05</div>
+  <div class="block-body">
+    <p class="kicker">L'illusion du hasard</p>
+    <h2>Pourquoi ça paraît « aléatoire »</h2>
+    <p>Le comportement n'a rien de fortuit&nbsp;: il dépend, BG par BG, d'<strong>une seule variable</strong>&nbsp;— le compte connecté est-il, oui ou non, dans le groupe qui détient le FullAccess de cette boîte. Comme chaque CR peuple ses BG avec ses propres conventions de comptes, le résultat varie d'une boîte à l'autre… et d'un collaborateur à l'autre, puisqu'ils n'ouvrent pas leur session avec le même compte.</p>
+
+    <figure class="diagram">
+      <div class="scroller">
+        <svg viewBox="0 0 720 318" role="img" aria-label="Matrice : l'ouverture silencieuse depend de la presence du compte connecte dans le groupe FullAccess">
+          <text class="s-lbl" x="20" y="32" font-size="11" fill="#8A98AD">BOÎTE GROUPE</text>
+          <text class="s-lbl" x="250" y="32" font-size="11" fill="#8A98AD">GROUPE FULLACCESS (PRÉFIXE ATTENDU)</text>
+          <text class="s-lbl" x="556" y="32" font-size="11" fill="#8A98AD">RÉSULTAT POUR N9999</text>
+          <line x1="20" y1="42" x2="700" y2="42" stroke="#C3CCDA"/>
+
+          <text class="s-mono" x="20" y="78" font-size="12.5" font-weight="600" fill="#15233D">contrats@cr-A</text>
+          <rect x="250" y="60" width="244" height="30" rx="7" fill="#FBF1E2" stroke="#E6CDA6"/><text class="s-mono" x="264" y="80" font-size="12" fill="#B5701A" font-weight="600">GU_xxx_Contrats · membres N…</text>
+          <rect x="556" y="60" width="148" height="30" rx="7" fill="#E3F2EC" stroke="#B6DCCD"/><text class="s-sans" x="570" y="80" font-size="12" fill="#0E7257" font-weight="600">✓ silencieux</text>
+
+          <text class="s-mono" x="20" y="134" font-size="12.5" font-weight="600" fill="#15233D">saisies@camorbi.fr</text>
+          <rect x="250" y="116" width="244" height="30" rx="7" fill="#E3F2EC" stroke="#B6DCCD"/><text class="s-mono" x="264" y="136" font-size="12" fill="#0E7257" font-weight="600">GU_860_Saisie · membres V…</text>
+          <rect x="556" y="116" width="148" height="30" rx="7" fill="#FAE9E6" stroke="#E2B7B0"/><text class="s-sans" x="570" y="136" font-size="12" fill="#B23A2E" font-weight="600">🔒 pop-up</text>
+
+          <text class="s-mono" x="20" y="190" font-size="12.5" font-weight="600" fill="#15233D">guichet@cr-C</text>
+          <rect x="250" y="172" width="244" height="30" rx="7" fill="#E3F2EC" stroke="#B6DCCD"/><text class="s-mono" x="264" y="192" font-size="12" fill="#0E7257" font-weight="600">GU_xxx_Guichet · membres W…</text>
+          <rect x="556" y="172" width="148" height="30" rx="7" fill="#FAE9E6" stroke="#E2B7B0"/><text class="s-sans" x="570" y="192" font-size="12" fill="#B23A2E" font-weight="600">🔒 pop-up</text>
+
+          <line x1="20" y1="224" x2="700" y2="224" stroke="#C3CCDA" stroke-dasharray="3 4"/>
+          <text class="s-sans" x="20" y="252" font-size="12.5" font-weight="700" fill="#15233D">Même BG, deux collègues&nbsp;:</text>
+          <rect x="20" y="264" width="330" height="40" rx="8" fill="#FFFFFF" stroke="#C3CCDA"/>
+          <text class="s-sans" x="34" y="281" font-size="11.5" fill="#46566F">Session ouverte avec un compte <tspan class="s-mono" fill="#0E7257" font-weight="600">V…</tspan> du groupe</text>
+          <text class="s-sans" x="34" y="297" font-size="11.5" fill="#0E7257" font-weight="600">→ ✓ aucun pop-up</text>
+          <rect x="370" y="264" width="330" height="40" rx="8" fill="#FFFFFF" stroke="#C3CCDA"/>
+          <text class="s-sans" x="384" y="281" font-size="11.5" fill="#46566F">Session ouverte avec un compte <tspan class="s-mono" fill="#B5701A" font-weight="600">N…</tspan> hors groupe</text>
+          <text class="s-sans" x="384" y="297" font-size="11.5" fill="#B23A2E" font-weight="600">→ 🔒 pop-up</text>
+        </svg>
+      </div>
+      <figcaption><b>La règle unique&nbsp;:</b> ouverture silencieuse <em>si et seulement si</em> le compte de la session appartient au groupe FullAccess de la BG. Tout le reste — « selon le collab », « pas toutes les BG » — découle de là.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="block">
+  <div class="rail-num">06</div>
+  <div class="block-body">
+    <p class="kicker">Le test qui confirme le diagnostic</p>
+    <h2>Pourquoi vider le coffre-fort ne règle rien</h2>
+    <p>Le coffre-fort Windows (Gestionnaire d'identifiants) ne fait que <strong>mémoriser</strong> les identifiants saisis pour rejouer la connexion sans redemander. Le purger supprime ce cache&nbsp;: la prochaine ouverture redemande donc le mot de passe — puis, si la personne coche « mémoriser », le re-stocke. La cause profonde — l'absence d'habilitation de <span class="tok tok-n">N9999</span> sur la boîte — reste intacte.</p>
+    <div class="callout warn">
+      <span class="lab">Ce que ça nous apprend</span>
+      <p>Justement parce que la purge <em>ne corrige pas</em> le problème, on peut écarter l'hypothèse d'un cache corrompu ou d'un identifiant périmé. Le défaut est en amont, du côté des <strong>droits</strong>, pas du côté du stockage de mots de passe. C'est l'indice qui fait basculer l'incident de « messagerie » vers « habilitation ».</p>
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="rail-num">07</div>
+  <div class="block-body">
+    <p class="kicker">La correction</p>
+    <h2>Rétablir un vrai SSO</h2>
+    <p>L'objectif&nbsp;: que l'identité avec laquelle l'utilisatrice ouvre sa session soit aussi celle qui détient les droits sur la BG. Concrètement, on rattache le compte de connexion à un groupe de sécurité portant <strong>FullAccess + SendAs</strong> sur la boîte groupe.</p>
+
+    <figure class="diagram">
+      <div class="scroller">
+        <svg viewBox="0 0 720 250" role="img" aria-label="Comparaison avant apres : N9999 hors groupe avec pop-up, puis N9999 membre du groupe FullAccess et SendAs avec SSO silencieux">
+          <text class="s-lbl" x="20" y="30" font-size="11" fill="#B23A2E">AVANT</text>
+          <rect x="20" y="42" width="320" height="180" rx="12" fill="#FFFFFF" stroke="#C3CCDA"/>
+          <rect x="40" y="64" width="120" height="30" rx="7" fill="#FBF1E2" stroke="#E6CDA6"/><text class="s-mono" x="54" y="84" font-size="12.5" font-weight="600" fill="#B5701A">ZCA\N9999</text>
+          <line x1="100" y1="94" x2="100" y2="118" stroke="#C3CCDA" stroke-dasharray="4 3"/>
+          <text class="s-sans" x="112" y="112" font-size="11.5" fill="#B23A2E" font-weight="600">✗ hors du groupe</text>
+          <rect x="40" y="126" width="280" height="30" rx="7" fill="#FAE9E6" stroke="#E2B7B0"/><text class="s-sans" x="54" y="146" font-size="12" fill="#B23A2E" font-weight="600">🔒 Pop-up de mot de passe</text>
+          <line x1="180" y1="156" x2="180" y2="174" stroke="#C3CCDA"/>
+          <rect x="40" y="180" width="280" height="30" rx="7" fill="#F2F4F8" stroke="#DCE1EA"/><text class="s-mono" x="54" y="200" font-size="12" fill="#46566F">saisies@camorbi.fr (après ressaisie)</text>
+
+          <text x="358" y="138" font-size="22" fill="#0E7257" font-weight="700">→</text>
+
+          <text class="s-lbl" x="382" y="30" font-size="11" fill="#0E7257">APRÈS</text>
+          <rect x="382" y="42" width="318" height="180" rx="12" fill="#FFFFFF" stroke="#C3CCDA"/>
+          <rect x="402" y="64" width="120" height="30" rx="7" fill="#FBF1E2" stroke="#E6CDA6"/><text class="s-mono" x="416" y="84" font-size="12.5" font-weight="600" fill="#B5701A">ZCA\N9999</text>
+          <line x1="462" y1="94" x2="462" y2="116" stroke="#C3CCDA"/>
+          <rect x="402" y="118" width="280" height="38" rx="8" fill="#EDEFF4" stroke="#C3CCDA"/>
+          <text class="s-mono" x="416" y="135" font-size="11.5" font-weight="600" fill="#15233D">GU_BG_Saisie_FA_SA</text>
+          <text class="s-sans" x="416" y="150" font-size="10.5" fill="#46566F">FullAccess + SendAs · contient N9999</text>
+          <line x1="542" y1="156" x2="542" y2="174" stroke="#C3CCDA"/>
+          <rect x="402" y="180" width="280" height="30" rx="7" fill="#E3F2EC" stroke="#B6DCCD"/><text class="s-sans" x="416" y="200" font-size="12" fill="#0E7257" font-weight="600">✓ SSO Kerberos — aucun pop-up</text>
+        </svg>
+      </div>
+      <figcaption><b>Le principe&nbsp;:</b> on ne change pas la façon dont l'utilisatrice se connecte — on amène le droit jusqu'à son compte de session, via un groupe dédié.</figcaption>
+    </figure>
+
+    <p style="margin-top:18px"><strong>Deux points à ne pas confondre&nbsp;:</strong></p>
+    <ul class="clean">
+      <li><strong>FullAccess</strong> permet d'<em>ouvrir et lire</em> la boîte. Il ne suffit pas pour envoyer <em>au nom de</em> la BG.</li>
+      <li><strong>SendAs</strong> est un droit distinct&nbsp;: sans lui, l'envoi depuis l'adresse de la BG est refusé. Il faut donc bien accorder <strong>les deux</strong> sur le même groupe.</li>
+    </ul>
+
+    <div class="callout reco">
+      <span class="lab">Recommandation — l'industrialiser, pas le bricoler à la main</span>
+      <p>Plutôt que d'ajouter des droits boîte par boîte via l'EMS (Exchange Management Shell / PowerShell) — lourd, manuel, source d'écarts — créer pour chaque BG <strong>un groupe de sécurité standardisé</strong> portant FullAccess + SendAs, puis <strong>piloter son peuplement par l'automate (EDS)</strong>. On habilite alors un utilisateur sur une BG en l'ajoutant au bon groupe, sans toucher à Exchange. C'est exactement le « type de peuplement à automatiser et rattacher à l'EDS » évoqué dans le ticket.</p>
+      <p>Convention de nommage suggérée pour rester lisible côté CR&nbsp;: <span class="mono">GU_&lt;CR&gt;_&lt;BG&gt;_FA_SA</span>. L'auto-mapping ne se déclenchant pas sur un droit porté par groupe, la BG continue d'être ajoutée explicitement au profil — comportement attendu et maîtrisé.</p>
+    </div>
+
+    <div class="callout warn">
+      <span class="lab">Question d'architecture à remonter</span>
+      <p>La vraie racine est en amont de l'incident&nbsp;: le modèle <strong>multi-comptes</strong> (28 comptes pour une personne, un par CR, avec des préfixes N / V / W…) garantit que, tôt ou tard, le compte de session ne coïncidera pas avec le compte habilité. La correction ci-dessus traite chaque BG efficacement, mais une rationalisation du modèle de comptes — ou une stratégie d'habilitation systématiquement adossée au compte de connexion — éviterait que le problème ne réapparaisse ailleurs.</p>
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="rail-num">08</div>
+  <div class="block-body">
+    <p class="kicker">Plan d'action</p>
+    <h2>Pour clore l'incident</h2>
+    <ol class="steps">
+      <li><b>Confirmer le diagnostic sur le cas</b>Vérifier que <span class="tok tok-n">N9999</span> n'est pas membre de <span class="tok tok-grp">GU_860_Saisie</span> et que ce groupe ne contient que des comptes V. Côté Exchange, lister FullAccess/SendAs de <span class="mono">saisies@camorbi.fr</span>.</li>
+      <li><b>Identifier l'identité de session « cible »</b>Recenser, pour l'utilisatrice, le compte avec lequel elle ouvre réellement sa session Windows, et les BG qu'elle doit atteindre depuis cette session.</li>
+      <li><b>Accorder FullAccess + SendAs au bon compte</b>Via un groupe de sécurité dédié à la BG (les deux droits), peuplé du compte de connexion. Ne pas oublier le SendAs si l'envoi au nom de la BG est attendu.</li>
+      <li><b>Purger le coffre-fort puis tester</b>Maintenant que le droit existe&nbsp;: vider le Gestionnaire d'identifiants, redémarrer, et vérifier que la BG s'ouvre <strong>sans pop-up</strong>. La purge n'a de sens qu'<em>après</em> avoir corrigé l'habilitation.</li>
+      <li><b>Vérifier Kerberos (si pop-up résiduels)</b>S'assurer que le SSO emprunte bien Kerberos (SPN / compte de service alternatif corrects) plutôt qu'un repli NTLM, qui peut déclencher des invites supplémentaires.</li>
+      <li><b>Industrialiser via l'EDS</b>Généraliser le schéma « 1 BG = 1 groupe FA+SA », rattacher le peuplement à l'automate, et sortir de la gestion manuelle EMS.</li>
+    </ol>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="legend">
+      <span class="li"><span class="sw" style="background:#FBF1E2;border-color:#E6CDA6"></span> compte N — connecté, non habilité</span>
+      <span class="li"><span class="sw" style="background:#E3F2EC;border-color:#B6DCCD"></span> compte V — habilité / état corrigé</span>
+      <span class="li"><span class="sw" style="background:#FAE9E6;border-color:#E2B7B0"></span> échec / pop-up</span>
+      <span class="li"><span class="sw" style="background:#EDEFF4;border-color:#C3CCDA"></span> groupe de sécurité</span>
+    </div>
+    <h3>Hypothèses &amp; périmètre</h3>
+    <ul>
+      <li>Analyse établie à partir du ticket&nbsp;: BG hébergées <strong>on-prem</strong>, authentification intégrée Windows, profils Outlook sur postes physiques.</li>
+      <li>Les noms (<span style="font-family:'IBM Plex Mono',monospace">camorbi.fr</span>, <span style="font-family:'IBM Plex Mono',monospace">ca-neo.fr</span>, <span style="font-family:'IBM Plex Mono',monospace">GU_860_Saisie</span>) reprennent l'exemple du ticket&nbsp;; les BG <span style="font-family:'IBM Plex Mono',monospace">contrats@cr-A</span> / <span style="font-family:'IBM Plex Mono',monospace">guichet@cr-C</span> sont illustratives.</li>
+      <li><strong>EMS</strong> = Exchange Management Shell (administration PowerShell d'Exchange). <strong>EDS</strong> est traité comme l'outil d'automatisation / de peuplement interne mentionné dans le ticket&nbsp;; à confirmer selon votre référentiel.</li>
+      <li>Le diagnostic n'est pas un avis de sécurité formel&nbsp;: faire valider l'octroi des droits et le modèle de groupes par l'équipe habilitations / la CR concernée.</li>
+    </ul>
+  </div>
+</footer>
+
+</body>
+</html>
