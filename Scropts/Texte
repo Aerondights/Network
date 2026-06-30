@@ -1,0 +1,60 @@
+Deux remarques avant les détails, parce qu'elles vont vous éviter des erreurs de frappe et de logique :
+
+- La clé de délégation s'écrit `CredentialsDelegation` **avec un « s »** (`...\Microsoft\Windows\CredentialsDelegation`), pas `CredentialDelegation`. Un mauvais chemin = politique ignorée silencieusement.
+- `ConcatenateDefaults_AllowFreshNTLMOnly` **n'est pas une GPO séparée**. C'est la case à cocher *à l'intérieur* de la même stratégie « …NTLM uniquement ». Vous ne pilotez pas trois valeurs avec trois réglages, mais une seule stratégie qui écrit plusieurs valeurs.
+
+Laissez-moi confirmer le mapping exact de `AuthenticationLevel` (la valeur 0/1/2), parce que c'est précisément celle qui vous bloque et qu'il ne faut pas inverser.Voici les deux mappings exacts. Le `AuthenticationLevel` (valeurs 0/1/2) est confirmé par l'ADMX `TerminalServer.admx` lui-même, donc pas d'ambiguïté.
+
+## 1. AuthenticationLevel
+
+C'est la stratégie **« Configurer l'authentification du serveur pour le client »** :
+
+`Configuration ordinateur > Modèles d'administration > Composants Windows > Services Bureau à distance > Client Connexion Bureau à distance`
+
+Valeur écrite dans `HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services\AuthenticationLevel` (REG_DWORD), avec ce mapping (item ADMX → valeur) :
+
+- **0** = « Toujours se connecter, même si l'authentification échoue » (TS_SERVER_AUTH_NONE, decimal 0)
+- **1** = « Ne pas se connecter si l'authentification échoue » (TS_SERVER_AUTH_REQUIRE, decimal 1) ← **c'est très probablement ce qui vous bloque actuellement**
+- **2** = « M'avertir si l'authentification échoue » (TS_SERVER_AUTH_ATTEMPT, decimal 2)
+
+Pour passer en force (contourner le non-match de nom), la stratégie doit être **Activée** + choix **« Toujours se connecter »**, soit `AuthenticationLevel = 0`. En ligne de commande :
+```
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v AuthenticationLevel /t REG_DWORD /d 0 /f
+```
+
+Deux points essentiels :
+- Quand cette stratégie est **Activée**, elle **prime sur le .rdp et sur `AuthenticationLevelOverride`**. C'est exactement pourquoi votre `authentication level:i:0` était ignoré : si la stratégie est désactivée ou non configurée, c'est le réglage du .rdp / de la Connexion Bureau à distance qui décide ; sinon c'est la stratégie. Donc si vous voulez plutôt **rendre la main au .rdp**, mettez la GPO sur **Non configuré** (ce qui supprime la valeur), pas sur 0.
+- Si `gpresult` ne montre aucune GPO gagnante mais que la valeur 1 est quand même là, c'est un reliquat « tatoué » dans le registre : supprimez la valeur à la main.
+
+Réserve déjà évoquée : `0` ne fait que **supprimer l'avertissement de nom** ; sur un client 25H2 récent, le refus du non-match de nom peut être inconditionnel et 0 ne suffira pas. À tester chez vous.
+
+## 2. AllowFreshCredentialsWhenNTLMOnly + ConcatenateDefaults_AllowFreshNTLMOnly
+
+Attention : ce sont **deux valeurs issues d'UNE seule stratégie**, pas deux réglages distincts :
+
+`Configuration ordinateur > Modèles d'administration > Système > Délégation d'informations d'identification > « Autoriser la délégation des nouvelles informations d'identification avec une authentification de serveur NTLM uniquement »`
+
+Quand vous la mettez sur **Activée**, le volet d'options contient :
+- un bouton **« Afficher… »** qui ouvre la liste des SPN cibles — vous y ajoutez une entrée comme `TERMSRV/*` (ou mieux, scopé : `TERMSRV/*.yres.ytech`) ;
+- une case **« Concaténer les valeurs par défaut du système d'exploitation avec l'entrée ci-dessus »**.
+
+Correspondance dans le registre (`...\Microsoft\Windows\CredentialsDelegation`) :
+- `AllowFreshCredentialsWhenNTLMOnly` (REG_DWORD) = **1** → la stratégie est activée
+- sous-clé `AllowFreshCredentialsWhenNTLMOnly\` contenant des **REG_SZ** nommés `1`, `2`, … → la liste des SPN. Un seul caractère générique est autorisé dans le SPN ; `TERMSRV/*` vise tous les hôtes, `TERMSRV/*.domaine` tous ceux du domaine.
+- `ConcatenateDefaults_AllowFreshNTLMOnly` (REG_DWORD) = **1** → la case « Concaténer… » est cochée
+
+En commandes :
+```
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation" /v AllowFreshCredentialsWhenNTLMOnly /t REG_DWORD /d 1 /f
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation\AllowFreshCredentialsWhenNTLMOnly" /v 1 /t REG_SZ /d "TERMSRV/*" /f
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation" /v ConcatenateDefaults_AllowFreshNTLMOnly /t REG_DWORD /d 1 /f
+```
+
+**Le piège à retenir** : le DWORD à `1` **seul ne fait rien** — une stratégie activée avec une liste vide = délégation vers personne. Sur votre toute première capture, on voyait les DWORD parents à 1, mais jamais le contenu des sous-clés. Si ces sous-clés `\1 = TERMSRV/...` sont vides, c'est très probablement là votre vrai trou côté délégation. Vérifiez avec :
+```
+reg query "HKLM\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation\AllowFreshCredentialsWhenNTLMOnly"
+```
+
+## Ordre des opérations
+
+Les deux jouent à des étages différents : `AuthenticationLevel = 0` est ce qui **lève l'erreur exacte de votre écran** (non-match de nom, étage TLS). Les politiques NTLM-only + liste SPN sont l'étage **délégation des identifiants**, qui intervient une fois le nom accepté. Pour reproduire votre montage qui marchait, il vous faut donc les deux — mais c'est la voie « contournement », avec les fragilités déjà signalées par rapport au wildcard scopé.
